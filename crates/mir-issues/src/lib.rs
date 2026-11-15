@@ -713,6 +713,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/tainted_unserialize/`.
     TaintedUnserialize,
 
+    /// `password_hash()` is called with options or input that weaken it.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/insecure_password_hash/`.
+    InsecurePasswordHash { reason: String },
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1161,6 +1166,7 @@ impl IssueKind {
             | IssueKind::UseStatementHasNoEffect { .. }
             | IssueKind::PrivateFinalMethod { .. }
             | IssueKind::NonPublicMagicMethod { .. }
+            | IssueKind::InsecurePasswordHash { .. }
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1453,6 +1459,7 @@ impl IssueKind {
             IssueKind::TaintedInclude => "MIR0812",
             IssueKind::TaintedEval => "MIR0813",
             IssueKind::TaintedUnserialize => "MIR0814",
+            IssueKind::InsecurePasswordHash { .. } => "MIR0815",
 
             // Generics (0900-0999)
             IssueKind::InvalidTemplateParam { .. } => "MIR0900",
@@ -1558,7 +1565,7 @@ impl IssueKind {
             | "MIR0408" | "MIR0500" | "MIR0506" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
-            | "MIR1514" | "MIR0238" => Some(Severity::Warning),
+            | "MIR1514" | "MIR0238" | "MIR0815" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1747,6 +1754,7 @@ impl IssueKind {
             IssueKind::TaintedInclude => "TaintedInclude",
             IssueKind::TaintedEval => "TaintedEval",
             IssueKind::TaintedUnserialize => "TaintedUnserialize",
+            IssueKind::InsecurePasswordHash { .. } => "InsecurePasswordHash",
             IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
             IssueKind::DeprecatedProperty { .. } => "DeprecatedProperty",
             IssueKind::DeprecatedConstant { .. } => "DeprecatedConstant",
@@ -2497,6 +2505,7 @@ impl IssueKind {
             IssueKind::TaintedUnserialize => {
                 "Tainted unserialize() payload — possible object injection".to_string()
             }
+            IssueKind::InsecurePasswordHash { reason } => format!("Insecure password hashing: {reason}"),
 
             IssueKind::DeprecatedCall { name, message } => {
                 let base = format!("Call to deprecated function {name}");
@@ -3334,6 +3343,7 @@ mod code_tests {
             IssueKind::TaintedInclude,
             IssueKind::TaintedEval,
             IssueKind::TaintedUnserialize,
+            IssueKind::InsecurePasswordHash { reason: s() },
             IssueKind::InvalidTemplateParam {
                 name: s(),
                 expected_bound: s(),
@@ -3534,6 +3544,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 195);
+        assert_eq!(one_of_each().len(), 196);
     }
 }

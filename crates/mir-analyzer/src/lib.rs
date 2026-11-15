@@ -37,6 +37,7 @@ pub mod php_version;
 pub mod prelude;
 pub mod recursion;
 pub(crate) mod reference_key;
+pub(crate) mod security;
 pub mod session;
 pub mod source_provider;
 pub(crate) mod stmt;
