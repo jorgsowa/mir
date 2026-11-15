@@ -154,6 +154,19 @@ fn restore_skipped_rhs_var(rhs: &php_ast::owned::Expr, ctx: &mut FlowState) {
     }
 }
 
+/// Narrow types from `assert($expr)` but keep taint: `zend.assertions=-1` skips the check.
+pub fn narrow_from_assertion(
+    expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let outer = std::mem::replace(&mut ctx.ignore_taint_guards, true);
+    narrow_from_condition(expr, ctx, is_true, db, file);
+    ctx.ignore_taint_guards = outer;
+}
+
 /// Narrow the types in `ctx` as if `expr` evaluates to `is_true`.
 pub fn narrow_from_condition(
     expr: &php_ast::owned::Expr,
@@ -169,7 +182,7 @@ pub fn narrow_from_condition(
             std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
         }
     }
-    if db.taint_analysis() {
+    if db.taint_analysis() && !ctx.ignore_taint_guards {
         let scope = crate::taint_guard::GuardScope {
             ctx: &*ctx,
             db,
@@ -1688,7 +1701,7 @@ pub fn narrow_from_condition(
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_value) = call.args.first().and_then(|arg_expr| arg_expr.value())
                     {
-                        narrow_from_condition(arg_value, ctx, is_true, db, file);
+                        narrow_from_assertion(arg_value, ctx, is_true, db, file);
                     }
                 } else if bare.eq_ignore_ascii_case("method_exists")
                     || bare.eq_ignore_ascii_case("property_exists")

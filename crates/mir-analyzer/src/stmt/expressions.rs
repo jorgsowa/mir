@@ -1,7 +1,7 @@
 use super::StatementsAnalyzer;
 use crate::ast_ext::NameBareExt as _;
 use crate::flow_state::FlowState;
-use crate::narrowing::narrow_from_condition;
+use crate::narrowing::narrow_from_assertion;
 use mir_issues::IssueKind;
 use php_ast::owned::{Expr, ExprKind};
 
@@ -31,7 +31,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         // Check the asserted condition *before* narrowing, so the
                         // original (docblock) type is still in scope.
                         self.check_docblock_contradiction(value, ctx);
-                        narrow_from_condition(value, ctx, true, self.db, &self.file);
+                        narrow_from_assertion(value, ctx, true, self.db, &self.file);
                     }
                 }
             }

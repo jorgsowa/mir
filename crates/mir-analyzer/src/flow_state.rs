@@ -358,6 +358,9 @@ pub struct FlowState {
     /// arguments carrying only parameter labels still need callee summaries.
     pub summarizing_taint: bool,
 
+    /// Set while narrowing from `assert()`, whose check production builds compile out.
+    pub ignore_taint_guards: bool,
+
     /// `(slot, name)` of each by-ref parameter whose exit taint the summary records.
     pub byref_out_slots: Arc<[(usize, Name)]>,
 
@@ -853,6 +856,7 @@ impl FlowState {
             closures: Arc::default(),
             taint_trails: Arc::default(),
             summarizing_taint: false,
+            ignore_taint_guards: false,
             byref_out_slots: Arc::default(),
             param_parts: Arc::default(),
             plain_vars: Arc::default(),
