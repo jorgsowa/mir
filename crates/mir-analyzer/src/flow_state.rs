@@ -100,6 +100,8 @@ pub enum ValueOrigin {
     WeakRandom,
     /// A request superglobal or a value read from one.
     RequestInput,
+    /// A string checked not to start with `-`, so it can't pass a command-line option.
+    NoLeadingDash,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

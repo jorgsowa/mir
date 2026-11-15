@@ -307,6 +307,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .kind
                     .resolve_name_ref(self.db, &self.file)
                     .unwrap_or_default();
+                if crate::taint::runs_program_directly(self.db, &fqcn) {
+                    if let Some(command) = n.args.first().and_then(|a| a.value()) {
+                        crate::taint::check_command_arguments(self, command, ctx, span);
+                    }
+                }
                 let Some(kind) = crate::taint::classify_constructor_sink(self.db, &fqcn, &n.args)
                 else {
                     return;

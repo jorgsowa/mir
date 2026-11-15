@@ -556,6 +556,9 @@ impl CallAnalyzer {
                 && fn_name_lower == "proc_open"
                 && crate::taint::proc_open_bypasses_shell(&call.args, ctx)
             {
+                if let Some(command) = call.args.first().and_then(|a| a.value()) {
+                    crate::taint::check_command_arguments(ea, command, ctx, span);
+                }
                 continue;
             }
             let matches_param = |position: usize, arg: &php_ast::owned::Arg| match &arg.name {

@@ -824,3 +824,134 @@ fn may_have_string_keys(value: &Expr, ctx: &FlowState) -> bool {
         _ => false,
     })
 }
+
+// ---------------------------------------------------------------------------
+// Argument injection
+// ---------------------------------------------------------------------------
+
+/// Classes whose constructor takes a program and its arguments as an array: Symfony's `Process`.
+pub fn runs_program_directly(db: &dyn crate::db::MirDatabase, fqcn: &str) -> bool {
+    let base = "Symfony\\Component\\Process\\Process";
+    fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
+}
+
+/// Report a tainted argument of a program run without a shell (`proc_open(['git', 'clone',
+/// $url])`) that can start with `-` and so pass an option, unless a `--` comes before it.
+pub fn check_command_arguments(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    command: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let ExprKind::Array(elements) = &unwrap_parens(command).kind else {
+        return;
+    };
+    for element in elements.iter().skip(1) {
+        if element.is_spread() || element.key.is_some() {
+            return;
+        }
+        let value = element.value();
+        if matches!(&value.kind, ExprKind::String(s) if s.as_str() == "--") {
+            return;
+        }
+        let dash_checked = matches!(&value.kind, ExprKind::Variable(v)
+            if ctx.has_value_origin(v, ValueOrigin::NoLeadingDash));
+        if has_literal_prefix(value) || dash_checked {
+            continue;
+        }
+        if expr_taint(value, ctx, ea.db, &ea.file)
+            .concrete()
+            .intersects(Taint::SHELL)
+        {
+            let issue = mir_issues::IssueKind::TaintedCommandArgument;
+            ea.emit_taint(issue, span, value, Taint::SHELL, ctx);
+            return;
+        }
+    }
+}
+
+/// Record that a variable can't start with `-` where `cond` evaluating to `holds` proves it:
+/// `!str_starts_with($x, '-')`, `$x[0] !== '-'`, `str_starts_with($x, 'https://')`.
+pub fn mark_dash_checked(cond: &Expr, holds: bool, ctx: &mut FlowState) {
+    let is_dash = |e: &Expr| matches!(&e.kind, ExprKind::String(s) if s.as_str() == "-");
+    // The variable, and whether `cond` holding means it starts with `-`.
+    let checked: Option<(&str, bool)> = match &unwrap_parens(cond).kind {
+        ExprKind::FunctionCall(fc)
+            if fc
+                .name
+                .kind
+                .name_bare()
+                .is_some_and(|n| n.eq_ignore_ascii_case("str_starts_with")) =>
+        {
+            match (
+                positional_value(&fc.args, 0).map(|v| &v.kind),
+                positional_value(&fc.args, 1),
+            ) {
+                (Some(ExprKind::Variable(v)), Some(prefix)) if is_dash(prefix) => {
+                    Some((&**v, true))
+                }
+                (Some(ExprKind::Variable(v)), Some(prefix)) => match &prefix.kind {
+                    ExprKind::String(s) if !s.is_empty() && !s.as_str().starts_with('-') => {
+                        holds.then_some((&**v, false))
+                    }
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        ExprKind::Binary(b) => {
+            let equal = match b.op {
+                php_ast::ast::BinaryOp::Identical | php_ast::ast::BinaryOp::Equal => true,
+                php_ast::ast::BinaryOp::NotIdentical | php_ast::ast::BinaryOp::NotEqual => false,
+                _ => return,
+            };
+            let (subject, literal) = (unwrap_parens(&b.left), unwrap_parens(&b.right));
+            let (subject, literal) =
+                if matches!(subject.kind, ExprKind::String(_) | ExprKind::Int(_)) {
+                    (literal, subject)
+                } else {
+                    (subject, literal)
+                };
+            first_char_subject(subject, literal).map(|v| (v, equal))
+        }
+        _ => None,
+    };
+    if let Some((var, means_dash)) = checked {
+        if holds != means_dash {
+            ctx.mark_value_origin(var, ValueOrigin::NoLeadingDash);
+        }
+    }
+}
+
+fn positional_value(args: &[php_ast::owned::Arg], index: usize) -> Option<&Expr> {
+    args.get(index)
+        .filter(|a| a.name.is_none() && !a.unpack())
+        .and_then(|a| a.value())
+}
+
+/// The variable whose first character `subject` compared with `literal` tests for `-`:
+/// `$x[0] === '-'`, `substr($x, 0, 1) === '-'`, `strpos($x, '-') === 0`.
+fn first_char_subject<'e>(subject: &'e Expr, literal: &Expr) -> Option<&'e str> {
+    let var = |e: &'e Expr| match &e.kind {
+        ExprKind::Variable(v) => Some(&**v),
+        _ => None,
+    };
+    let int =
+        |e: Option<&Expr>, n: i64| matches!(e.map(|e| &e.kind), Some(ExprKind::Int(i)) if *i == n);
+    let dash = |e: Option<&Expr>| matches!(e.map(|e| &e.kind), Some(ExprKind::String(s)) if s.as_str() == "-");
+    match &subject.kind {
+        ExprKind::ArrayAccess(aa) if int(aa.index.as_ref(), 0) && dash(Some(literal)) => {
+            var(&aa.array)
+        }
+        ExprKind::FunctionCall(fc) => {
+            let name = fc.name.kind.name_bare()?.to_ascii_lowercase();
+            let arg = |i: usize| fc.args.get(i).and_then(|a| a.value());
+            match name.as_str() {
+                "substr" if int(arg(1), 0) && int(arg(2), 1) && dash(Some(literal)) => var(arg(0)?),
+                "strpos" if dash(arg(1)) && int(Some(literal), 0) => var(arg(0)?),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
