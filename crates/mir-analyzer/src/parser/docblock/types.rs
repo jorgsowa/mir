@@ -1137,6 +1137,22 @@ pub(crate) fn expand_int_mask_members(members: &[i64]) -> Option<Type> {
     if members.is_empty() || members.len() > 8 || members.iter().any(|&v| v < 0) {
         return None;
     }
+    thread_local! {
+        static EXPANDED: RefCell<rustc_hash::FxHashMap<Vec<i64>, Type>> = RefCell::default();
+    }
+    if let Some(hit) = EXPANDED.with(|cache| cache.borrow().get(members).cloned()) {
+        return Some(hit);
+    }
+    let expanded = expand_int_mask_members_uncached(members);
+    EXPANDED.with(|cache| {
+        cache
+            .borrow_mut()
+            .insert(members.to_vec(), expanded.clone())
+    });
+    Some(expanded)
+}
+
+fn expand_int_mask_members_uncached(members: &[i64]) -> Type {
     let mut values = std::collections::BTreeSet::new();
     for subset in 0u32..(1u32 << members.len()) {
         let value = members
@@ -1149,7 +1165,7 @@ pub(crate) fn expand_int_mask_members(members: &[i64]) -> Option<Type> {
     // Distinct int literals never absorb each other, so `add_type` would build the same union.
     let mut u = Type::empty();
     u.types.extend(values.into_iter().map(Atomic::TLiteralInt));
-    Some(u)
+    u
 }
 
 /// `(declaring class FQCN, its own literal-int constants)`.

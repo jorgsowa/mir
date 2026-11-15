@@ -13,6 +13,8 @@ type ClassExistsGuards = FxHashSet<Arc<str>>;
 
 /// A dead write: `(variable, line, col_start, line_end, col_end)`.
 type DeadWrite = (Name, u32, u16, u32, u16);
+/// Dead writes in the order they were found, each once.
+pub type DeadWrites = indexmap::IndexSet<DeadWrite, rustc_hash::FxBuildHasher>;
 /// `(line, col_start, line_end, col_end)` of a write.
 type WriteLoc = (u32, u16, u32, u16);
 
@@ -33,23 +35,28 @@ fn union_into<T: Copy + Eq + std::hash::Hash>(
 
 /// Append `src` dead writes onto `dst`, skipping entries already present.
 ///
-/// Critical for bounding memory in `merge_branches`: both branch contexts are
-/// derived from `pre`, so each already contains all of `pre`'s dead writes.
-/// Naively concatenating them onto a `pre`-derived `dst` re-includes `pre`'s
-/// entries on every merge — under nested-loop fixpoint analysis the `Vec` then
-/// grows multiplicatively (≈3× per merge → exponential, reaching gigabytes).
-/// A dead write is uniquely identified by its `(variable, location)` tuple, so
-/// deduplication is also semantically correct (one diagnostic per location).
-fn extend_dead_writes_dedup(dst: &mut Vec<DeadWrite>, src: Vec<DeadWrite>) {
-    if src.is_empty() {
+/// Both branch contexts descend from `pre`, so they share its dead writes as a
+/// prefix; only the rest of `src` is looked up, and a shared `dst` is cloned
+/// only when `src` adds something.
+fn extend_dead_writes_dedup(dst: &mut Arc<DeadWrites>, src: &Arc<DeadWrites>) {
+    if Arc::ptr_eq(dst, src) || src.is_empty() {
         return;
     }
-    let mut seen: FxHashSet<DeadWrite> = dst.iter().copied().collect();
-    for dw in src {
-        if seen.insert(dw) {
-            dst.push(dw);
-        }
+    let shared = dst
+        .iter()
+        .zip(src.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mut added = src
+        .iter()
+        .skip(shared)
+        .filter(|dw| !dst.contains(*dw))
+        .peekable();
+    if added.peek().is_none() {
+        return;
     }
+    let added: Vec<DeadWrite> = added.copied().collect();
+    Arc::make_mut(dst).extend(added);
 }
 
 // ---------------------------------------------------------------------------
@@ -508,7 +515,7 @@ pub struct FlowState {
 
     /// Dead writes collected during analysis: writes that were overwritten
     /// without being read first. Accumulated via union across branches.
-    pub dead_writes: Arc<Vec<DeadWrite>>,
+    pub dead_writes: Arc<DeadWrites>,
 
     /// Write locations that were consumed by a read on SOME path. A write is
     /// only dead if NO path reads it, so consumption is permanent: merges
@@ -868,7 +875,7 @@ impl FlowState {
             diverges: false,
             var_locations: FxHashMap::default().into(),
             last_write_locs: FxHashMap::default().into(),
-            dead_writes: Vec::new().into(),
+            dead_writes: Default::default(),
             consumed_write_locs: FxHashSet::default().into(),
             foreach_value_var_names: FxHashSet::default(),
             foreach_byref_var_names: FxHashSet::default(),
@@ -2438,7 +2445,7 @@ impl FlowState {
             // Previous write(s) overwritten without being read → dead writes.
             for old_loc in old_locs {
                 std::sync::Arc::make_mut(&mut self.dead_writes)
-                    .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
+                    .insert((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
             }
         }
         std::sync::Arc::make_mut(&mut self.last_write_locs).insert(
@@ -2581,10 +2588,7 @@ impl FlowState {
                 });
             }
             // Dead writes from the diverging branch are still dead.
-            extend_dead_writes_dedup(
-                Arc::make_mut(&mut result.dead_writes),
-                Arc::unwrap_or_clone(if_ctx.dead_writes),
-            );
+            extend_dead_writes_dedup(&mut result.dead_writes, &if_ctx.dead_writes);
             for name in if_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
@@ -2619,10 +2623,7 @@ impl FlowState {
                     !locs.is_empty()
                 });
             }
-            extend_dead_writes_dedup(
-                Arc::make_mut(&mut result.dead_writes),
-                Arc::unwrap_or_clone(else_ctx.dead_writes),
-            );
+            extend_dead_writes_dedup(&mut result.dead_writes, &else_ctx.dead_writes);
             for name in else_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
@@ -2650,17 +2651,9 @@ impl FlowState {
                 &mut result.consumed_write_locs,
                 &else_ctx.consumed_write_locs,
             );
-            // `result` is `pre.clone()`; both branches already contain pre's
-            // dead writes, so rebuild deduped rather than concatenating.
-            std::sync::Arc::make_mut(&mut result.dead_writes).clear();
-            extend_dead_writes_dedup(
-                Arc::make_mut(&mut result.dead_writes),
-                Arc::unwrap_or_clone(if_ctx.dead_writes),
-            );
-            extend_dead_writes_dedup(
-                Arc::make_mut(&mut result.dead_writes),
-                Arc::unwrap_or_clone(else_ctx.dead_writes),
-            );
+            // Both branches already contain pre's dead writes, so start from one branch, not pre.
+            result.dead_writes = Arc::clone(&if_ctx.dead_writes);
+            extend_dead_writes_dedup(&mut result.dead_writes, &else_ctx.dead_writes);
             for name in if_ctx
                 .foreach_value_var_names
                 .iter()
@@ -3145,21 +3138,9 @@ impl FlowState {
             }
         }
 
-        // Dead writes: union of both branches, deduplicated. `result` is
-        // `pre.clone()` and both branches descend from `pre`, so they already
-        // contain pre's dead writes — rebuild from the branches rather than
-        // concatenating onto pre's copy (which would grow the Vec ~3× per merge
-        // → exponential under nested-loop fixpoint analysis; see
-        // `extend_dead_writes_dedup`).
-        result.dead_writes = Arc::new(Vec::new());
-        extend_dead_writes_dedup(
-            Arc::make_mut(&mut result.dead_writes),
-            Arc::unwrap_or_clone(if_ctx.dead_writes),
-        );
-        extend_dead_writes_dedup(
-            Arc::make_mut(&mut result.dead_writes),
-            Arc::unwrap_or_clone(else_ctx.dead_writes),
-        );
+        // Both branches already contain pre's dead writes, so start from one branch, not pre.
+        result.dead_writes = Arc::clone(&if_ctx.dead_writes);
+        extend_dead_writes_dedup(&mut result.dead_writes, &else_ctx.dead_writes);
 
         // Consumed write locations: union — a write read on ANY path is used.
         result.consumed_write_locs = if_ctx.consumed_write_locs;
@@ -3477,7 +3458,7 @@ impl FlowState {
     ) -> Option<FxHashSet<Name>> {
         if unused_tracking
             && (self.last_write_locs != other.last_write_locs
-                || self.dead_writes != other.dead_writes)
+                || !self.dead_writes.iter().eq(other.dead_writes.iter()))
         {
             return None;
         }
