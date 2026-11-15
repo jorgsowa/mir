@@ -126,6 +126,7 @@ pub enum SinkKind {
     Callable,    // callbacks and dynamic calls → arbitrary code paths
     Xml,         // XML parsed with entity expansion → XXE / XML denial of service
     Eval,        // code that will run: PHP files written, templates compiled → code injection
+    Csv,         // spreadsheet export fields → formula injection
 }
 
 impl SinkKind {
@@ -145,6 +146,7 @@ impl SinkKind {
             SinkKind::Callable => IssueKind::TaintedCallable,
             SinkKind::Xml => IssueKind::TaintedXml,
             SinkKind::Eval => IssueKind::TaintedEval,
+            SinkKind::Csv => IssueKind::TaintedCsv,
         }
     }
 
@@ -163,6 +165,7 @@ impl SinkKind {
             SinkKind::Callable => Taint::CALLABLE,
             SinkKind::Xml => Taint::OTHER,
             SinkKind::Eval => Taint::EVAL,
+            SinkKind::Csv => Taint::OTHER,
         }
     }
 }
@@ -372,6 +375,12 @@ pub fn option_sink_values<'e>(
             .map(|v| (v, SinkKind::Xml))
             .into_iter()
             .collect(),
+        "fputcsv" => args
+            .get(1)
+            .filter(|a| a.name.is_none() && !a.unpack())
+            .and_then(|a| a.value())
+            .map(csv_formula_fields)
+            .unwrap_or_default(),
         "file_put_contents" => match (
             args.first()
                 .filter(|a| a.name.is_none())
@@ -441,7 +450,7 @@ pub fn method_sink_value<'e>(
     fqcn: &str,
     method_lower: &str,
     args: &'e [php_ast::owned::Arg],
-) -> Option<(&'e Expr, SinkKind)> {
+) -> Vec<(&'e Expr, SinkKind)> {
     let is_a = |base: &str| {
         fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
     };
@@ -450,7 +459,10 @@ pub fn method_sink_value<'e>(
             .filter(|a| a.name.is_none())
             .and_then(|a| a.value())
     };
-    match method_lower {
+    if method_lower == "fputcsv" && is_a("SplFileObject") {
+        return first().map(csv_formula_fields).unwrap_or_default();
+    }
+    let value = match method_lower {
         "loadxml" if is_a("DOMDocument") => {
             xml_with_unsafe_flags(args, 0, "source", 1, "options").map(|v| (v, SinkKind::Xml))
         }
@@ -464,7 +476,8 @@ pub fn method_sink_value<'e>(
                 .map(|v| (v, SinkKind::Eval))
         }
         _ => None,
-    }
+    };
+    value.into_iter().collect()
 }
 
 /// Template source a static call compiles and runs: `Blade::render($template)`.
@@ -896,6 +909,11 @@ pub fn check_named_arg_spread(
 
 /// `'prefix_' . $x` or `"prefix_$x"`: a name confined to its literal prefix.
 fn has_literal_prefix(expr: &Expr) -> bool {
+    literal_prefix(expr).is_some_and(|prefix| !prefix.is_empty())
+}
+
+/// The literal text a concatenation or interpolated string starts with.
+fn literal_prefix(expr: &Expr) -> Option<&str> {
     let mut first = unwrap_parens(expr);
     while let ExprKind::Binary(b) = &first.kind {
         if b.op != php_ast::ast::BinaryOp::Concat {
@@ -904,12 +922,41 @@ fn has_literal_prefix(expr: &Expr) -> bool {
         first = unwrap_parens(&b.left);
     }
     match &first.kind {
-        ExprKind::String(s) => !std::ptr::eq(first, unwrap_parens(expr)) && !s.is_empty(),
-        ExprKind::InterpolatedString(_) => matches!(
-            crate::ast_ext::StringPartsExt::string_parts(&first.kind).first(),
-            Some(StringPart::Literal(s)) if !s.is_empty()
-        ),
-        _ => false,
+        ExprKind::String(s) if !std::ptr::eq(first, unwrap_parens(expr)) => Some(s.as_str()),
+        ExprKind::InterpolatedString(_) => {
+            match crate::ast_ext::StringPartsExt::string_parts(&first.kind).first() {
+                Some(StringPart::Literal(s)) => Some(s.as_str()),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Fields of a CSV row a spreadsheet may read as a formula: each element of a literal row
+/// unless it starts with literal text that isn't `=`, `+`, `-`, `@`, tab or carriage return,
+/// or a whole request array.
+fn csv_formula_fields(row: &Expr) -> Vec<(&Expr, SinkKind)> {
+    match &unwrap_parens(row).kind {
+        ExprKind::Array(elements) => elements
+            .iter()
+            .map(|element| element.value())
+            .filter(|value| {
+                literal_prefix(value).is_none_or(|prefix| {
+                    prefix.is_empty() || prefix.starts_with(['=', '+', '-', '@', '\t', '\r'])
+                })
+            })
+            .map(|value| (value, SinkKind::Csv))
+            .collect(),
+        ExprKind::Variable(name)
+            if matches!(
+                name.trim_start_matches('$'),
+                "_GET" | "_POST" | "_REQUEST" | "_COOKIE"
+            ) =>
+        {
+            vec![(row, SinkKind::Csv)]
+        }
+        _ => Vec::new(),
     }
 }
 

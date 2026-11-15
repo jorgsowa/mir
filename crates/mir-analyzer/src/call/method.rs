@@ -1769,7 +1769,7 @@ fn resolve_method_return<'a>(
         {
             crate::taint::check_mongo_filter(ea, filter, ctx, span);
         }
-        if let Some((value, kind)) =
+        for (value, kind) in
             crate::taint::method_sink_value(ea.db, fqcn.as_ref(), &method_name_lower, &call.args)
         {
             let issue = kind.issue();
@@ -1783,6 +1783,7 @@ fn resolve_method_return<'a>(
                 ea.taint_summary,
             ) {
                 ea.emit_taint(issue, span, value, kind.taint(), ctx);
+                break;
             }
         }
 
