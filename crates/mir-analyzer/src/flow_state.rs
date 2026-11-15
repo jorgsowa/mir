@@ -1588,20 +1588,22 @@ impl FlowState {
         let receiver = Name::from(stripped);
         self.drop_index_hop_receivers(stripped);
         self.forget_local_props(receiver);
-        self.drop_prop_guards(&format!("{stripped}->"));
+        let under_receiver = |key: &str| {
+            key.strip_prefix(stripped)
+                .is_some_and(|rest| rest.starts_with("->"))
+        };
+        self.drop_guards_where(under_receiver);
         // A 2-hop chained receiver key (`chained_prop_receiver_key`) encodes
         // as `"{receiver}->{prop}"` — an entry keyed this way is also stale
         // once `receiver` itself may have been reassigned by an opaque call,
         // not just an entry keyed by `receiver` exactly.
-        let chain_prefix = format!("{stripped}->");
         if self
             .prop_refined
             .keys()
-            .any(|(obj, _)| *obj == receiver || obj.as_ref().starts_with(chain_prefix.as_str()))
+            .any(|(obj, _)| *obj == receiver || under_receiver(obj.as_ref()))
         {
-            Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| {
-                *obj != receiver && !obj.as_ref().starts_with(chain_prefix.as_str())
-            });
+            Arc::make_mut(&mut self.prop_refined)
+                .retain(|(obj, _), _| *obj != receiver && !under_receiver(obj.as_ref()));
         }
     }
 

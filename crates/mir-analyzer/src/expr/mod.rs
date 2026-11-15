@@ -1750,9 +1750,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    fn records_refs(&self) -> bool {
+        self.mode != AnalysisMode::InferenceOnly && self.record_reference_locations
+    }
+
     /// Record a reference location for `symbol_key` at `span`, unless in inference-only mode.
     pub(crate) fn record_ref(&self, symbol_key: Arc<str>, span: php_ast::Span) {
-        if self.mode == AnalysisMode::InferenceOnly || !self.record_reference_locations {
+        if !self.records_refs() {
             return;
         }
         // Static property tokens (`Cls::$prop`) span the `$` sigil while
@@ -1787,12 +1791,18 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub(crate) fn record_class_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
+        if !self.records_refs() {
+            return;
+        }
         let key = self.reference_key_cache.class(fqcn.as_ref());
         self.record_ref(key, span);
     }
 
     pub(crate) fn record_function_ref(&mut self, fqn: impl AsRef<str>, span: php_ast::Span) {
         let fqn = fqn.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("fn:{fqn}"));
         self.record_ref(key, span);
     }
@@ -1805,6 +1815,9 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) {
         let class = class.as_ref();
         let name = name.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("meth:{class}::{name}"));
         self.record_ref(key, span);
     }
@@ -1817,30 +1830,45 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) {
         let class = class.as_ref();
         let name = name.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("prop:{class}::{name}"));
         self.record_ref(key, span);
     }
 
     pub(crate) fn record_global_constant_ref(&mut self, fqn: impl AsRef<str>, span: php_ast::Span) {
         let fqn = fqn.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("gcnst:{fqn}"));
         self.record_ref(key, span);
     }
 
     pub(crate) fn record_dynamic_member_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
         let fqcn = fqcn.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("dyn:{fqcn}"));
         self.record_ref(key, span);
     }
 
     pub(crate) fn record_impl_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
         let fqcn = fqcn.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("impl:{fqcn}"));
         self.record_ref(key, span);
     }
 
     pub(crate) fn record_propname_ref(&mut self, name: impl AsRef<str>, span: php_ast::Span) {
         let name = name.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("propname:{name}"));
         self.record_ref(key, span);
     }
@@ -1853,6 +1881,9 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) {
         let class = class.as_ref();
         let name = name.as_ref();
+        if !self.records_refs() {
+            return;
+        }
         let key = Arc::<str>::from(format!("traituse:{class}::{name}"));
         self.record_ref(key, span);
     }

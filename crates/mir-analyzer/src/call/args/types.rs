@@ -342,7 +342,7 @@ pub(crate) fn check_one(
         return;
     }
 
-    let arg_display = arg_ty.to_string();
+    let unsplit_arg_ty = arg_ty;
     let split_bool;
     let arg_ty = if let Some(t) = split_bool_for_single_literal_param(arg_ty, param_ty) {
         split_bool = t;
@@ -372,7 +372,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: arg_display.clone(),
+                    actual: unsplit_arg_ty.to_string(),
                 },
                 Severity::Info,
                 arg_span,
@@ -420,7 +420,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: arg_display,
+                    actual: unsplit_arg_ty.to_string(),
                 },
                 Severity::Info,
                 arg_span,
@@ -449,14 +449,14 @@ pub(crate) fn check_one(
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected,
-                actual: arg_display,
+                actual: unsplit_arg_ty.to_string(),
             }
         } else {
             IssueKind::PossiblyInvalidArgument {
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected,
-                actual: arg_display,
+                actual: unsplit_arg_ty.to_string(),
             }
         };
         let severity = kind.default_severity();
@@ -487,14 +487,14 @@ pub(crate) fn check_one(
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected,
-                actual: arg_display,
+                actual: unsplit_arg_ty.to_string(),
             }
         } else {
             IssueKind::PossiblyInvalidArgument {
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected,
-                actual: arg_display,
+                actual: unsplit_arg_ty.to_string(),
             }
         };
         let severity = kind.default_severity();
@@ -535,14 +535,14 @@ pub(crate) fn check_one(
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected,
-                actual: arg_display,
+                actual: unsplit_arg_ty.to_string(),
             }
         } else {
             IssueKind::PossiblyInvalidArgument {
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected,
-                actual: arg_display,
+                actual: unsplit_arg_ty.to_string(),
             }
         };
         let severity = kind.default_severity();
@@ -559,7 +559,7 @@ pub(crate) fn check_one(
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected: format!("{param_ty}"),
-                actual: arg_display,
+                actual: unsplit_arg_ty.to_string(),
             },
             Severity::Info,
             arg_span,
@@ -630,7 +630,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: arg_display.clone(),
+                    actual: unsplit_arg_ty.to_string(),
                 },
                 Severity::Info,
                 arg_span,
@@ -641,7 +641,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: arg_display.clone(),
+                    actual: unsplit_arg_ty.to_string(),
                 },
                 Severity::Info,
                 arg_span,
@@ -659,7 +659,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: arg_display.clone(),
+                    actual: unsplit_arg_ty.to_string(),
                 },
                 Severity::Info,
                 arg_span,
@@ -670,7 +670,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: arg_display.clone(),
+                    actual: unsplit_arg_ty.to_string(),
                 },
                 Severity::Warning,
                 arg_span,
@@ -693,7 +693,7 @@ pub(crate) fn check_one(
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected: format!("{param_ty}"),
-                actual: arg_display.clone(),
+                actual: unsplit_arg_ty.to_string(),
             },
             Severity::Info,
             arg_span,
@@ -714,7 +714,7 @@ pub(crate) fn check_one(
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected: format!("{param_ty}"),
-                actual: arg_display.clone(),
+                actual: unsplit_arg_ty.to_string(),
             },
             Severity::Info,
             arg_span,
