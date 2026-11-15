@@ -10,6 +10,7 @@ mod effective_severity;
 mod file_extensions;
 mod multiple_paths_composer_root;
 mod no_taint_flag;
+mod opt_in_issue_kinds;
 mod partial_run_baseline;
 mod project_files_restrict_composer_discovery;
 mod psalm_error_level;

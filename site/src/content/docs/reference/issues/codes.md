@@ -176,6 +176,8 @@ issues keep their code.
 | MIR0817  | InsecureSessionConfig         | [security/insecure-session-config](../security/insecure-session-config/) |
 | MIR0818  | InsecureRandomness            | [security/insecure-randomness](../security/insecure-randomness/) |
 | MIR0819  | TaintedXml                    | [security/tainted-xml](../security/tainted-xml/) |
+| MIR0820  | UnsafeUnserialize             | [security/unsafe-unserialize](../security/unsafe-unserialize/) |
+| MIR0821  | UnserializeGadget             | [security/unserialize-gadget](../security/unserialize-gadget/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

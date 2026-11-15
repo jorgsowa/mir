@@ -52,6 +52,13 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if fn_name_lower == "unserialize" && unserializes_any_class(ea, args, ctx) {
+        ea.emit(
+            mir_issues::IssueKind::UnsafeUnserialize,
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(reason) = password_hash_misuse(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::InsecurePasswordHash { reason },
@@ -382,5 +389,76 @@ fn any_string_part(expr: &Expr, f: &mut dyn FnMut(&Expr) -> bool) -> bool {
                 .any(|part| matches!(part, php_ast::owned::StringPart::Expr(e) if f(e)))
         }
         _ => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unserialize
+// ---------------------------------------------------------------------------
+
+/// `unserialize()` of non-literal data that may create any class; tainted data is left to
+/// `TaintedUnserialize`.
+fn unserializes_any_class(
+    ea: &crate::expr::ExpressionAnalyzer<'_>,
+    args: &[Arg],
+    ctx: &FlowState,
+) -> bool {
+    let Some(data) = arg(args, 0, "data") else {
+        return false;
+    };
+    !matches!(data.kind, ExprKind::String(_) | ExprKind::Nowdoc(_))
+        && !crate::taint::unserialize_disallows_classes(args, ctx)
+        && !crate::taint::expr_taint(data, ctx, ea.db, &ea.file)
+            .concrete()
+            .intersects(crate::taint::Taint::UNSERIALIZE)
+}
+
+/// Report a magic method that runs on unserialized objects passing `$this->prop` to a sink.
+pub(crate) fn check_gadget_sinks(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    sink_values: &[(&Expr, crate::taint::SinkKind)],
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    use crate::taint::SinkKind;
+    let (Some(method), Some(class)) = (&ctx.current_method_name, &ctx.self_fqcn) else {
+        return;
+    };
+    let runs_on_unserialized = ["__destruct", "__wakeup", "__unserialize", "__tostring"]
+        .iter()
+        .any(|m| method.eq_ignore_ascii_case(m));
+    let reaches_gadget_sink = sink_values.iter().any(|(value, kind)| {
+        matches!(
+            kind,
+            SinkKind::File
+                | SinkKind::Shell
+                | SinkKind::Callable
+                | SinkKind::Unserialize
+                | SinkKind::Ssrf
+                | SinkKind::Sql
+        ) && copies_this_property(value)
+    });
+    if runs_on_unserialized && reaches_gadget_sink {
+        ea.emit(
+            mir_issues::IssueKind::UnserializeGadget {
+                class: class.to_string(),
+                method: method.to_string(),
+            },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+/// Whether the value is, or is built by concatenation from, a `$this->prop` read.
+fn copies_this_property(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            matches!(&pa.object.kind, ExprKind::Variable(v) if &**v == "this")
+                || copies_this_property(&pa.object)
+        }
+        ExprKind::ArrayAccess(aa) => copies_this_property(&aa.array),
+        ExprKind::Array(elements) => elements.iter().any(|el| copies_this_property(el.value())),
+        _ => any_string_part(expr, &mut copies_this_property),
     }
 }

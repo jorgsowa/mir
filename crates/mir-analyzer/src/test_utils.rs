@@ -165,7 +165,9 @@
 //!   (merged on top of any explicit handlers) so a fixture's bare top-level
 //!   functions don't emit unsolicited noise. That default is held back when the
 //!   fixture sets `<findUnusedCode>true</findUnusedCode>` or expects one of
-//!   those kinds.
+//!   those kinds. Opt-in kinds ([`crate::batch::opt_in_issue_kinds`]) are suppressed the
+//!   same way unless the fixture expects one or enables it with a level other than
+//!   `suppress` (`<UnsafeUnserialize errorLevel="warning"/>`).
 //! - `<fileExtensions><extension name="module"/>…` sets the extensions treated as PHP
 //!   source (default `php`); every fixture file with one is analyzed.
 //! - `<projectFiles><file name="a.module"/>` analyzes only that file plus what
@@ -232,6 +234,8 @@ struct FixtureConfig {
     /// `<findUnusedVariables>`: `false` hides the unused-variable kinds unless
     /// `findUnusedCode` is set; absent leaves them reported.
     find_unused_variables: Option<bool>,
+    /// Opt-in kinds an `<issueHandlers>` entry enables with a level other than `suppress`.
+    enabled_opt_in_kinds: Vec<String>,
     /// Set when the `.phpt` file itself isn't valid UTF-8: it was decoded as
     /// Latin-1, and its files are written back to disk as Latin-1 bytes.
     latin1: bool,
@@ -771,6 +775,12 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                 (Some("mir"), other) => panic!(
                     "fixture {path}: unsupported <{other}> — supported: phpVersion, findUnusedCode, findUnusedVariables, fileExtensions, issueHandlers, stubs, projectFiles, forbiddenFunctions"
                 ),
+                (Some("issueHandlers"), kind)
+                    if crate::batch::opt_in_issue_kinds().contains(&kind)
+                        && attr(e, "errorLevel").as_deref() != Some("suppress") =>
+                {
+                    config.enabled_opt_in_kinds.push(kind.to_string());
+                }
                 (Some("issueHandlers"), kind) => {
                     let level = attr(e, "errorLevel").unwrap_or_default();
                     assert_eq!(
@@ -1064,6 +1074,7 @@ fn update_requested() -> bool {
 
 fn run_diagnostic_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
     suppress_dead_code_by_default(&mut fixture);
+    suppress_opt_in_by_default(&mut fixture);
     let actual = run_analyzer(&file_refs(&fixture), &fixture.config);
 
     if update_requested() {
@@ -1076,6 +1087,7 @@ fn run_diagnostic_fixture(path: &str, content: &str, mut fixture: ParsedFixture)
 
 fn run_edit_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
     suppress_dead_code_by_default(&mut fixture);
+    suppress_opt_in_by_default(&mut fixture);
     let suppressed = fixture
         .config
         .suppressed_issue_kinds
@@ -1163,6 +1175,29 @@ fn run_edit_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
             fmt_issues(&before, fixture.is_multi),
             fmt_issues(&after, fixture.is_multi)
         );
+    }
+}
+
+/// Opt-in kinds stay hidden, as in the CLI, unless the fixture enables or expects them.
+fn suppress_opt_in_by_default(fixture: &mut ParsedFixture) {
+    for kind in crate::batch::opt_in_issue_kinds() {
+        let wanted = fixture
+            .config
+            .enabled_opt_in_kinds
+            .iter()
+            .any(|k| k == kind)
+            || fixture
+                .expected
+                .iter()
+                .chain(&fixture.expected_before_edits)
+                .any(|e| e.kind_name == *kind);
+        if !wanted {
+            fixture
+                .config
+                .suppressed_issue_kinds
+                .get_or_insert_with(Default::default)
+                .insert((*kind).to_string());
+        }
     }
 }
 

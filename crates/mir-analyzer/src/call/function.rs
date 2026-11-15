@@ -573,6 +573,7 @@ impl CallAnalyzer {
             }
         }
         sink_values.extend(crate::taint::option_sink_values(&fn_name_lower, &call.args));
+        crate::security::check_gadget_sinks(ea, &sink_values, ctx, span);
         let mut reported: Vec<SinkKind> = Vec::new();
         for (value, kind) in sink_values {
             if reported.contains(&kind) {

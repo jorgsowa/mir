@@ -51,6 +51,12 @@ pub fn unused_variable_issue_kinds() -> &'static [&'static str] {
     &["UnusedVariable", "UnusedForeachValue"]
 }
 
+/// Issue kinds reported only when the configuration enables them: noisy enough for an
+/// audit, not for every run.
+pub fn opt_in_issue_kinds() -> &'static [&'static str] {
+    &["UnsafeUnserialize", "UnserializeGadget"]
+}
+
 /// Per-batch options for [`AnalysisSession::analyze_paths`] and friends.
 ///
 /// Configuration that only makes sense for full-project (batch) analysis

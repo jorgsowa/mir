@@ -738,6 +738,16 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/tainted_xml/`.
     TaintedXml,
 
+    /// `unserialize()` of data that isn't a literal, without an `allowed_classes` restriction.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unsafe_unserialize/`.
+    UnsafeUnserialize,
+
+    /// A magic method that runs on unserialized objects passes one of its properties to a dangerous call.
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unserialize_gadget/`.
+    UnserializeGadget { class: String, method: String },
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1191,6 +1201,8 @@ impl IssueKind {
             | IssueKind::WeakCryptography { .. }
             | IssueKind::InsecureSessionConfig { .. }
             | IssueKind::InsecureRandomness { .. }
+            | IssueKind::UnsafeUnserialize
+            | IssueKind::UnserializeGadget { .. }
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1483,6 +1495,8 @@ impl IssueKind {
             IssueKind::TaintedInclude => "MIR0812",
             IssueKind::TaintedEval => "MIR0813",
             IssueKind::TaintedUnserialize => "MIR0814",
+            IssueKind::UnserializeGadget { .. } => "MIR0821",
+            IssueKind::UnsafeUnserialize => "MIR0820",
             IssueKind::TaintedXml => "MIR0819",
             IssueKind::InsecureRandomness { .. } => "MIR0818",
             IssueKind::InsecureSessionConfig { .. } => "MIR0817",
@@ -1593,9 +1607,8 @@ impl IssueKind {
             | "MIR0408" | "MIR0500" | "MIR0506" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
-            | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" => {
-                Some(Severity::Warning)
-            }
+            | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" | "MIR0820"
+            | "MIR0821" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1784,6 +1797,8 @@ impl IssueKind {
             IssueKind::TaintedInclude => "TaintedInclude",
             IssueKind::TaintedEval => "TaintedEval",
             IssueKind::TaintedUnserialize => "TaintedUnserialize",
+            IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
+            IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
             IssueKind::TaintedXml => "TaintedXml",
             IssueKind::InsecureRandomness { .. } => "InsecureRandomness",
             IssueKind::InsecureSessionConfig { .. } => "InsecureSessionConfig",
@@ -2539,6 +2554,8 @@ impl IssueKind {
             IssueKind::TaintedUnserialize => {
                 "Tainted unserialize() payload — possible object injection".to_string()
             }
+            IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
+            IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
             IssueKind::TaintedXml => "Tainted XML parsed with entity expansion, DTD loading or huge documents enabled — possible XXE or XML denial of service".to_string(),
             IssueKind::InsecureRandomness { context } => format!("Insecure randomness: {context} comes from a non-cryptographic generator; use random_bytes() or random_int()"),
             IssueKind::InsecureSessionConfig { reason } => format!("Insecure session handling: {reason}"),
@@ -3386,6 +3403,11 @@ mod code_tests {
             IssueKind::InsecureSessionConfig { reason: s() },
             IssueKind::InsecureRandomness { context: s() },
             IssueKind::TaintedXml,
+            IssueKind::UnsafeUnserialize,
+            IssueKind::UnserializeGadget {
+                class: s(),
+                method: s(),
+            },
             IssueKind::InvalidTemplateParam {
                 name: s(),
                 expected_bound: s(),
@@ -3586,6 +3608,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 200);
+        assert_eq!(one_of_each().len(), 202);
     }
 }

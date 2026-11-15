@@ -7,11 +7,11 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use mir_analyzer::{
     dead_code_issue_kinds, discover_files_pruned, discover_files_with_extensions,
-    unused_variable_issue_kinds, AnalysisResult, AnalysisSession, BatchOptions, IndexCancel,
-    IndexParallelism, PhpFileExtensions, PhpVersion,
+    opt_in_issue_kinds, unused_variable_issue_kinds, AnalysisResult, AnalysisSession, BatchOptions,
+    IndexCancel, IndexParallelism, PhpFileExtensions, PhpVersion,
 };
 
-use crate::config::Config;
+use crate::config::{Config, ErrorLevel};
 use crate::path_util::normalize_for_compare;
 use crate::{color, Cli, OutputFormat};
 
@@ -377,6 +377,15 @@ fn build_batch_opts(find_dead_code: bool, config: &Config) -> BatchOptions {
                 .map(|s| (*s).to_string()),
         );
     }
+    // An opt-in kind is reported once an `<issueHandlers>` entry gives it a level.
+    opts.suppressed_issue_kinds.extend(
+        opt_in_issue_kinds()
+            .iter()
+            .filter(|k| {
+                !matches!(config.issue_handlers.get(**k), Some(level) if *level != ErrorLevel::Suppress)
+            })
+            .map(|s| (*s).to_string()),
+    );
     opts
 }
 
