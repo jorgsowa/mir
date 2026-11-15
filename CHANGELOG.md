@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `HardcodedCredential` (MIR0837, warning): a non-empty literal password passed to `new PDO()`, `new mysqli()`, `mysqli_connect()`, `mysqli_real_connect()`, `ldap_bind()` or `oci_connect()`, or in a literal `pg_connect()` string, and string literals shaped like an AWS access key ID, a PEM private key with key material, or a Stripe live secret key.
 - `InsecureCors` (MIR0838, warning): `Access-Control-Allow-Origin` echoing `$_SERVER['HTTP_ORIGIN']`, directly or through a variable, in a file that sends `Access-Control-Allow-Credentials: true`, when no earlier condition checked the origin's value. A wildcard origin isn't reported, since browsers refuse it with credentials.
 - `PredictableSeed` (MIR0839, warning, opt-in): `mt_srand()` or `srand()` with a literal seed or one built from `time()`, `microtime()`, `hrtime()` or `getmypid()`, which makes every later `mt_rand()` and `rand()` result predictable.
+- `ObfuscatedCode` (MIR0840, warning): `eval()`, `assert()`, `create_function()`, `call_user_func()` or a call through a variable whose code or function name comes from `base64_decode()`, `gzinflate()`, `str_rot13()`, `hex2bin()` or a similar decoder, or from three or more `chr()` calls: the shape of web shells and backdoors.
 
 ### Changed
 

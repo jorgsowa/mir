@@ -109,6 +109,15 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    let code_arg = match fn_name_lower {
+        "assert" => arg(args, 0, "assertion"),
+        "create_function" => arg(args, 1, "code"),
+        "call_user_func" | "call_user_func_array" => arg(args, 0, "callback"),
+        _ => None,
+    };
+    if let Some(code) = code_arg {
+        check_obfuscated_code(ea, code, ctx, span);
+    }
     if matches!(fn_name_lower, "mt_srand" | "srand")
         && arg(args, 0, "seed").is_some_and(is_predictable_seed)
     {
@@ -1427,4 +1436,60 @@ fn allows_credentials(source: &str) -> bool {
     source
         .to_ascii_lowercase()
         .contains("access-control-allow-credentials: true")
+}
+
+// ---------------------------------------------------------------------------
+// Obfuscation
+// ---------------------------------------------------------------------------
+
+const DECODERS: &[&str] = &[
+    "base64_decode",
+    "gzinflate",
+    "gzuncompress",
+    "gzdecode",
+    "str_rot13",
+    "strrev",
+    "hex2bin",
+    "convert_uudecode",
+];
+
+/// Report code to run, or a function to call, that comes out of a decoder: the shape of a web
+/// shell or backdoor, `eval(gzinflate(base64_decode('...')))`.
+pub(crate) fn check_obfuscated_code(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    code: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    if is_decoded(code, ctx) {
+        ea.emit(
+            mir_issues::IssueKind::ObfuscatedCode,
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+/// A decoder's output, possibly concatenated, or a string spelled with three or more `chr()` calls.
+pub(crate) fn is_decoded(expr: &Expr, ctx: &FlowState) -> bool {
+    has_decoded_part(expr, ctx) || chr_calls(expr) >= 3
+}
+
+fn has_decoded_part(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(name) => ctx.has_value_origin(name, ValueOrigin::Decoded),
+        ExprKind::FunctionCall(fc) => named_one_of(&fc.name, DECODERS),
+        _ => any_string_part(expr, &mut |part| has_decoded_part(part, ctx)),
+    }
+}
+
+fn chr_calls(expr: &Expr) -> usize {
+    match &expr.kind {
+        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, &["chr"]) => 1,
+        ExprKind::Parenthesized(inner) => chr_calls(inner),
+        ExprKind::Binary(b) if b.op == php_ast::ast::BinaryOp::Concat => {
+            chr_calls(&b.left) + chr_calls(&b.right)
+        }
+        _ => 0,
+    }
 }

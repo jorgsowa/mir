@@ -112,6 +112,8 @@ pub enum ValueOrigin {
     SpoofableIp,
     /// The request's `Origin` header.
     OriginHeader,
+    /// The output of a decoder such as `base64_decode()` or `gzinflate()`.
+    Decoded,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

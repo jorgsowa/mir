@@ -658,6 +658,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 name.as_ref(),
                                 crate::flow_state::ValueOrigin::WeakRandom,
                             );
+                        } else if !a.by_ref && crate::security::is_decoded(&a.value, ctx) {
+                            ctx.mark_value_origin(
+                                name.as_ref(),
+                                crate::flow_state::ValueOrigin::Decoded,
+                            );
                         } else if !a.by_ref && crate::security::is_request_origin(&a.value, ctx) {
                             ctx.mark_value_origin(
                                 name.as_ref(),

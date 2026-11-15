@@ -148,6 +148,7 @@ impl CallAnalyzer {
             Some(name) => name,
             _ => {
                 crate::taint::check_callable_target(ea, &call.name, ctx, span);
+                crate::security::check_obfuscated_code(ea, &call.name, ctx, span);
                 let callee_ty = ea.analyze(&call.name, ctx);
                 crate::taint::check_closure_call_sinks(ea, &call.name, &call.args, ctx, span);
 

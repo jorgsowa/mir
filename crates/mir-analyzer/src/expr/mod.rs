@@ -1119,6 +1119,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Eval -------------------------------------------------------
             ExprKind::Eval(inner) => {
+                crate::security::check_obfuscated_code(self, inner, ctx, expr.span);
                 self.analyze(inner, ctx);
                 // `eval()` is its own AST node (not a FunctionCall), so
                 // classify_sink's name-based dispatch never sees it — tainted
