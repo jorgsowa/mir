@@ -431,21 +431,80 @@ fn xml_with_unsafe_flags<'e>(
         .flatten()
 }
 
-/// The XML a `DOMDocument::loadXML()` or `XMLReader::XML()` call parses with unsafe flags.
-pub fn xml_method_sink_value<'e>(
+/// The value a method call sinks when only some calls are sinks: XML that `DOMDocument::loadXML()`
+/// or `XMLReader::XML()` parses with unsafe flags, or template source that Twig's
+/// `createTemplate()` or a Smarty `string:`/`eval:` resource compiles into code.
+pub fn method_sink_value<'e>(
     db: &dyn crate::db::MirDatabase,
     fqcn: &str,
     method_lower: &str,
     args: &'e [php_ast::owned::Arg],
-) -> Option<&'e Expr> {
+) -> Option<(&'e Expr, SinkKind)> {
     let is_a = |base: &str| {
         fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
     };
+    let first = || {
+        args.first()
+            .filter(|a| a.name.is_none())
+            .and_then(|a| a.value())
+    };
     match method_lower {
-        "loadxml" if is_a("DOMDocument") => xml_with_unsafe_flags(args, 0, "source", 1, "options"),
-        "xml" if is_a("XMLReader") => xml_with_unsafe_flags(args, 0, "source", 2, "flags"),
+        "loadxml" if is_a("DOMDocument") => {
+            xml_with_unsafe_flags(args, 0, "source", 1, "options").map(|v| (v, SinkKind::Xml))
+        }
+        "xml" if is_a("XMLReader") => {
+            xml_with_unsafe_flags(args, 0, "source", 2, "flags").map(|v| (v, SinkKind::Xml))
+        }
+        "createtemplate" if is_a("Twig\\Environment") => first().map(|v| (v, SinkKind::Eval)),
+        "fetch" | "display" | "createtemplate" if is_a("Smarty") || is_a("Smarty\\Smarty") => {
+            first()
+                .filter(|v| names_string_resource(v))
+                .map(|v| (v, SinkKind::Eval))
+        }
         _ => None,
     }
+}
+
+/// Template source a static call compiles and runs: `Blade::render($template)`.
+pub fn static_method_sink_value<'e>(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    method_lower: &str,
+    args: &'e [php_ast::owned::Arg],
+) -> Option<(&'e Expr, SinkKind)> {
+    let compiler = "Illuminate\\View\\Compilers\\BladeCompiler";
+    let blade = fqcn.eq_ignore_ascii_case("Illuminate\\Support\\Facades\\Blade")
+        || fqcn.eq_ignore_ascii_case(compiler)
+        || crate::db::extends_or_implements(db, fqcn, compiler);
+    (method_lower == "render" && blade)
+        .then(|| {
+            args.first()
+                .filter(|a| a.name.is_none())
+                .and_then(|a| a.value())
+        })
+        .flatten()
+        .map(|v| (v, SinkKind::Eval))
+}
+
+/// A Smarty resource that compiles the rest of the string as a template: `'string:' . $tpl`.
+fn names_string_resource(resource: &Expr) -> bool {
+    let mut first = unwrap_parens(resource);
+    while let ExprKind::Binary(b) = &first.kind {
+        if b.op != php_ast::ast::BinaryOp::Concat {
+            break;
+        }
+        first = unwrap_parens(&b.left);
+    }
+    let text = match &first.kind {
+        ExprKind::String(s) => s.as_str(),
+        ExprKind::InterpolatedString(parts) => match parts.first() {
+            Some(StringPart::Literal(s)) => s.as_str(),
+            _ => return false,
+        },
+        _ => return false,
+    };
+    let text = text.to_ascii_lowercase();
+    text.starts_with("string:") || text.starts_with("eval:")
 }
 
 /// `proc_open([...])` runs the program directly, so its arguments can't inject shell syntax.

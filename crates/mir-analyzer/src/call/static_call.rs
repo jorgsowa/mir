@@ -456,6 +456,22 @@ impl CallAnalyzer {
                 Arc::from(bound_receiver_fqcn.as_str())
             };
         let method_name_lower = crate::util::php_ident_lowercase(method_name);
+        if let Some((value, kind)) =
+            crate::taint::static_method_sink_value(ea.db, &fqcn, &method_name_lower, &call.args)
+        {
+            let issue = kind.issue();
+            if crate::taint::reaches_sink(
+                value,
+                kind.taint(),
+                &issue,
+                ctx,
+                ea.db,
+                &ea.file,
+                ea.taint_summary,
+            ) {
+                ea.emit_taint(issue, span, value, kind.taint(), ctx);
+            }
+        }
 
         // Pre-mark by-reference argument variables as defined before evaluating
         // the arguments, so passing an undefined variable to an out-param (e.g.
