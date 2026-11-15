@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TaintedCommandArgument` (MIR0824, error): a request value as an argument of a program `proc_open()` or Symfony's `new Process()` runs from an array, where a value starting with `-` passes an option (`--upload-pack=...` for `git clone`). Not reported after a `--` element, for an element with a literal prefix, or for a value checked not to start with `-`.
 - `QuotedShellEscape` (MIR0825, warning): an `escapeshellarg()` result, or a variable assigned one, placed between a pair of quotes in a `system()`, `exec()`, `shell_exec()`, `passthru()`, `popen()`, `proc_open()` or backtick command. Its own quotes close the outer ones, so the value runs unquoted.
 - `TaintedEval` also covers request data `file_put_contents()` writes to a path ending in `.php`, `.phtml`, `.phar` or `.pht`, where it runs as code; its message now reads "Tainted code — possible code injection". `var_export()` clears the eval kind, since its output is a PHP literal.
+- `UnrestrictedFileUpload` (MIR0826, warning): `move_uploaded_file()` to a path ending in the client's file name (`$_FILES[...]['name']`, also through `basename()` or a variable), in a file with no extension or content check, so the client picks the extension. A check of `$_FILES[...]['type']` alone doesn't count.
 
 ### Changed
 

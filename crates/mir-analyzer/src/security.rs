@@ -67,6 +67,16 @@ pub(crate) fn check_builtin_call(
             check_quoted_shell_escape(ea, command, ctx, span);
         }
     }
+    if fn_name_lower == "move_uploaded_file"
+        && arg(args, 1, "to").is_some_and(|to| is_client_file_name(to, ctx))
+        && !checks_uploaded_files(ea.source)
+    {
+        ea.emit(
+            mir_issues::IssueKind::UnrestrictedFileUpload,
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(reason) = password_hash_misuse(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::InsecurePasswordHash { reason },
@@ -564,4 +574,82 @@ fn is_shell_escaped(expr: &Expr, ctx: &FlowState) -> bool {
         ExprKind::FunctionCall(fc) => named_one_of(&fc.name, &["escapeshellarg"]),
         _ => false,
     }
+}
+
+// ---------------------------------------------------------------------------
+// File uploads
+// ---------------------------------------------------------------------------
+
+/// A path whose last part is the name the client gave an uploaded file:
+/// `'uploads/' . basename($_FILES['f']['name'])`, so the client picks its extension.
+pub(crate) fn is_client_file_name(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(name) => ctx.has_value_origin(name, ValueOrigin::ClientFileName),
+        ExprKind::ArrayAccess(aa) => {
+            let mut base = expr;
+            let mut names_file = false;
+            while let ExprKind::ArrayAccess(aa) = &base.kind {
+                names_file |= literal_str(aa.index.as_ref()) == Some("name");
+                base = &aa.array;
+            }
+            names_file
+                && !matches!(literal_str(aa.index.as_ref()), Some(k) if k != "name")
+                && matches!(&base.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_FILES")
+        }
+        ExprKind::Parenthesized(inner) => is_client_file_name(inner, ctx),
+        ExprKind::Binary(b) if b.op == php_ast::ast::BinaryOp::Concat => {
+            is_client_file_name(&b.right, ctx)
+        }
+        ExprKind::InterpolatedString(parts) => matches!(
+            parts.last(),
+            Some(php_ast::owned::StringPart::Expr(e)) if is_client_file_name(e, ctx)
+        ),
+        ExprKind::FunctionCall(fc) => {
+            named_one_of(
+                &fc.name,
+                &[
+                    "basename",
+                    "strtolower",
+                    "trim",
+                    "str_replace",
+                    "preg_replace",
+                    "sanitize_file_name",
+                    "stripslashes",
+                    "urldecode",
+                ],
+            ) && fc
+                .args
+                .iter()
+                .filter_map(|a| a.value())
+                .next_back()
+                .is_some_and(|v| is_client_file_name(v, ctx))
+        }
+        _ => false,
+    }
+}
+
+/// Whether the file checks an upload's extension or content anywhere: a `$_FILES[...]['type']`
+/// comparison alone doesn't count, since the client sends that header.
+fn checks_uploaded_files(source: &str) -> bool {
+    let source = source.to_ascii_lowercase();
+    [
+        "pathinfo",
+        "getimagesize",
+        "exif_imagetype",
+        "finfo",
+        "mime_content_type",
+        "wp_check_filetype",
+        "imagecreatefrom",
+        "in_array",
+        "array_search",
+        "preg_match",
+        "str_ends_with",
+        "strrchr",
+        "substr",
+        "explode",
+        "guessextension",
+        "getclientoriginalextension",
+    ]
+    .iter()
+    .any(|check| source.contains(check))
 }

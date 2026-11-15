@@ -768,6 +768,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/quoted_shell_escape/`.
     QuotedShellEscape,
 
+    /// An uploaded file is saved under the name the client sent, with no check of its extension or content.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unrestricted_file_upload/`.
+    UnrestrictedFileUpload,
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1227,6 +1232,7 @@ impl IssueKind {
             | IssueKind::UnserializeGadget { .. }
             | IssueKind::MissingSensitiveParameter { .. }
             | IssueKind::QuotedShellEscape
+            | IssueKind::UnrestrictedFileUpload
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1507,6 +1513,7 @@ impl IssueKind {
             IssueKind::TaintedMassAssignment { .. } => "MIR0823",
             IssueKind::TaintedCommandArgument => "MIR0824",
             IssueKind::QuotedShellEscape => "MIR0825",
+            IssueKind::UnrestrictedFileUpload => "MIR0826",
             IssueKind::TaintedInput { .. } => "MIR0800",
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
@@ -1638,7 +1645,7 @@ impl IssueKind {
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
             | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" | "MIR0820"
-            | "MIR0821" | "MIR0822" | "MIR0825" => Some(Severity::Warning),
+            | "MIR0821" | "MIR0822" | "MIR0825" | "MIR0826" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1830,6 +1837,7 @@ impl IssueKind {
             IssueKind::TaintedMassAssignment { .. } => "TaintedMassAssignment",
             IssueKind::TaintedCommandArgument => "TaintedCommandArgument",
             IssueKind::QuotedShellEscape => "QuotedShellEscape",
+            IssueKind::UnrestrictedFileUpload => "UnrestrictedFileUpload",
             IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
@@ -2591,6 +2599,7 @@ impl IssueKind {
             IssueKind::TaintedMassAssignment { target } => format!("Tainted {target} — user input chooses what gets overwritten (mass assignment)"),
             IssueKind::TaintedCommandArgument => "Tainted command argument can start with '-' — possible argument injection".to_string(),
             IssueKind::QuotedShellEscape => "escapeshellarg() result placed inside quotes — its own quotes close them, so the value runs unquoted".to_string(),
+            IssueKind::UnrestrictedFileUpload => "Uploaded file saved under the client's file name with no extension check — possible web shell upload".to_string(),
             IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
@@ -3447,6 +3456,7 @@ mod code_tests {
                 method: s(),
             },
             IssueKind::MissingSensitiveParameter { param: s() },
+            IssueKind::UnrestrictedFileUpload,
             IssueKind::QuotedShellEscape,
             IssueKind::TaintedCommandArgument,
             IssueKind::TaintedMassAssignment { target: s() },
@@ -3650,6 +3660,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 206);
+        assert_eq!(one_of_each().len(), 207);
     }
 }

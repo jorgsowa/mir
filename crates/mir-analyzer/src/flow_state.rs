@@ -104,6 +104,8 @@ pub enum ValueOrigin {
     NoLeadingDash,
     /// An `escapeshellarg()` result, already wrapped in its own single quotes.
     ShellEscaped,
+    /// A path or name ending in the name the client gave an uploaded file.
+    ClientFileName,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

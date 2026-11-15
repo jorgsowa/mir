@@ -658,6 +658,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 name.as_ref(),
                                 crate::flow_state::ValueOrigin::WeakRandom,
                             );
+                        } else if !a.by_ref && crate::security::is_client_file_name(&a.value, ctx) {
+                            ctx.mark_value_origin(
+                                name.as_ref(),
+                                crate::flow_state::ValueOrigin::ClientFileName,
+                            );
                         } else if !a.by_ref && crate::security::is_request_input(&a.value, ctx) {
                             ctx.mark_value_origin(
                                 name.as_ref(),
@@ -819,6 +824,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // `=`, which fully replaces it) — so it stays tainted if
                     // either side was, not just the RHS.
                     ctx.taint_var(var_name, rhs_taint);
+                    if crate::security::is_client_file_name(&a.value, ctx) {
+                        ctx.mark_value_origin(
+                            var_name,
+                            crate::flow_state::ValueOrigin::ClientFileName,
+                        );
+                    }
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
                     ctx.record_var_location(var_name, line, col_start, line_end, col_end);
