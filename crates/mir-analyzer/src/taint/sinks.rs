@@ -280,6 +280,8 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
         | "imagecreatefromxbm"
         | "imagecreatefromxpm" => sinks![at(0, "filename", File)],
         "finfo_file" => sinks![at(1, "filename", File)],
+        // The file curl reads and uploads to wherever the request goes.
+        "curl_file_create" => sinks![at(0, "filename", File)],
         "mkdir" | "rmdir" | "scandir" | "opendir" | "chdir" => sinks![at(0, "directory", File)],
         "copy" | "rename" => sinks![at(0, "from", File), at(1, "to", File)],
         "symlink" | "link" => sinks![at(0, "target", File), at(1, "link", File)],
@@ -682,7 +684,8 @@ pub fn classify_constructor_sink(
         | "directoryiterator"
         | "filesystemiterator"
         | "recursivedirectoryiterator"
-        | "globiterator" => Some(SinkKind::File),
+        | "globiterator"
+        | "curlfile" => Some(SinkKind::File),
         "soapclient" => Some(SinkKind::Ssrf),
         _ => None,
     }
