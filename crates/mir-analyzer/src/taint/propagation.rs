@@ -45,6 +45,16 @@ pub(super) fn return_drops_taint(ty: &mir_types::Type) -> bool {
 }
 
 /// Builtin classes whose instances hand out the arrays and iterators they are built from.
+/// PHP 8.5's URL parsers, whose objects carry the URL they were built from.
+const URI_CLASSES: &[&str] = &["Uri\\Rfc3986\\Uri", "Uri\\WhatWg\\Url"];
+
+pub fn is_uri_class(fqcn: &str) -> bool {
+    let fqcn = fqcn.trim_start_matches('\\');
+    URI_CLASSES
+        .iter()
+        .any(|class| fqcn.eq_ignore_ascii_case(class))
+}
+
 const ITERATOR_WRAPPERS: &[&str] = &[
     "ArrayObject",
     "ArrayIterator",
@@ -93,6 +103,7 @@ fn iterator_wrapper_taint(
             .is_some_and(|(owner, _)| {
                 ITERATOR_WRAPPERS
                     .iter()
+                    .chain(URI_CLASSES)
                     .any(|wrapper| owner.trim_start_matches('\\').eq_ignore_ascii_case(wrapper))
             })
     });
@@ -1115,6 +1126,9 @@ pub fn expr_taint(
                 let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                 if is_laravel_request_facade_source(fqcn.as_ref(), &method_lower) {
                     return Taint::ALL;
+                }
+                if method_lower == "parse" && is_uri_class(fqcn.as_ref()) {
+                    return args_taint(&smc.args, ctx, db, file);
                 }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 let forwards_this = match &smc.class.kind {

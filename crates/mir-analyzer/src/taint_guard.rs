@@ -577,7 +577,7 @@ fn guarded_by_literal<'e>(
     if holds != matched_when {
         return None;
     }
-    let (guarded, safe) = compared_subject(subject)?;
+    let (guarded, safe) = compared_subject(subject, scope)?;
     Some((guarded, safe.intersection(comparison_safe)))
 }
 
@@ -614,7 +614,7 @@ fn guarded_by_list<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded
     {
         return None;
     }
-    let (guarded, safe) = compared_subject(fc.args.first()?.value()?)?;
+    let (guarded, safe) = compared_subject(fc.args.first()?.value()?, scope)?;
     Some((guarded, safe.intersection(comparison_safe)))
 }
 
@@ -663,7 +663,10 @@ fn is_fixed_literal_list(haystack: &Expr, scope: GuardScope<'_>) -> bool {
 
 /// The value a comparison checks, and the kinds an exact match leaves it safe for: changing the
 /// case adds no metacharacter, while trimming hides whitespace a line break can be part of.
-fn compared_subject(expr: &Expr) -> Option<(Guarded<'_>, Taint)> {
+fn compared_subject<'e>(expr: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'e>, Taint)> {
+    if let Some(uri) = parsed_uri_host(expr, scope) {
+        return Some((Guarded::Var(uri), Taint::SSRF));
+    }
     if let ExprKind::FunctionCall(fc) = &expr.kind {
         let [arg] = &fc.args[..] else {
             return None;
@@ -680,6 +683,30 @@ fn compared_subject(expr: &Expr) -> Option<(Guarded<'_>, Taint)> {
         return Some((guarded_subject(arg.value()?)?, safe));
     }
     Some((guarded_subject(expr)?, Taint::ALL))
+}
+
+/// `$uri` of `$uri->getHost()` on a parsed `Uri\Rfc3986\Uri` or `Uri\WhatWg\Url`: a host the
+/// program compares against fixes where requests built from `$uri` go.
+fn parsed_uri_host<'e>(expr: &'e Expr, scope: GuardScope<'_>) -> Option<&'e str> {
+    let (ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc)) = &expr.kind else {
+        return None;
+    };
+    let (ExprKind::Variable(var), ExprKind::Identifier(method)) =
+        (&mc.object.kind, &mc.method.kind)
+    else {
+        return None;
+    };
+    let reads_host = ["gethost", "getasciihost", "getunicodehost", "getrawhost"]
+        .iter()
+        .any(|m| method.eq_ignore_ascii_case(m));
+    let ty = scope.ctx.get_var(var);
+    let is_uri = !ty.types.is_empty()
+        && ty.types.iter().all(|atom| match atom {
+            mir_types::Atomic::TNamedObject { fqcn, .. } => crate::taint::is_uri_class(fqcn),
+            mir_types::Atomic::TNull => true,
+            _ => false,
+        });
+    (mc.args.is_empty() && reads_host && is_uri).then_some(var.as_ref())
 }
 
 /// `isset($map[$x])` or `array_key_exists($x, $map)` proves the value is one of the map's keys.
@@ -714,7 +741,9 @@ fn guarded_by_map_key<'e>(cond: &'e Expr, scope: GuardScope<'_>) -> Option<(Guar
             .types
             .iter()
             .all(|atom| matches!(atom, mir_types::Atomic::TKeyedArray { is_open: false, .. }));
-    only_listed_keys.then(|| compared_subject(key)).flatten()
+    only_listed_keys
+        .then(|| compared_subject(key, scope))
+        .flatten()
 }
 
 fn is_literal(expr: &Expr) -> bool {
