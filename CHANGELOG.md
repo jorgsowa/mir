@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `assert()` no longer clears taint. It still narrows types, but production builds set `zend.assertions=-1`, so `assert(ctype_digit($id)); echo $id;` sends the input out unchecked.
 - A URL parsed with PHP 8.5's `new Uri\Rfc3986\Uri()`, `new Uri\WhatWg\Url()` or their `::parse()` keeps the request taint of its input, so `curl_init($url->toAsciiString())` on request data is `TaintedSsrf`. Comparing the parsed host with literal hosts (`$uri->getHost() === 'api.example.com'`, or `in_array()` over a fixed list) clears the SSRF taint, since the parser resolves the host the way the request does.
 - `filter_var($x, FILTER_VALIDATE_IP)` and `filter_input(..., FILTER_VALIDATE_IP)` no longer clear SSRF taint, since a valid IP can be a loopback, private or cloud metadata address. Passing `FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE` or `FILTER_FLAG_GLOBAL_RANGE` still clears it.
+- A method returning `static<A, B>`, such as Laravel's `Collection::map()`, `flip()`, `keyBy()` or `chunk()`, returns the receiver's class with those type args instead of the receiver's own, so `collect($paths)->map(fn (string $p) => new Post($p))` holds `Post` objects rather than strings. Conditionals inside those args are resolved, and members the class's template bounds exclude are dropped.
+- `MissingPropertyType` no longer reports a property redeclaring an inherited untyped one, such as `$signature` in a Laravel `Command`: PHP doesn't allow the child to add a type.
 
 ## [0.101.0] - 2026-11-14
 

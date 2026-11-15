@@ -160,7 +160,7 @@ fn resolve_conditional_dyn(
     resolved.from_docblock = ty.from_docblock;
     for atomic in ty.types {
         let mir_types::Atomic::TConditional { data } = &atomic else {
-            resolved.add_type(atomic);
+            resolved.add_type(resolve_conditional_type_args(atomic, db, templates, lookup));
             continue;
         };
         // A union argument takes the branch each of its members takes.
@@ -192,6 +192,34 @@ fn resolve_conditional_dyn(
         }
     }
     crate::subtype::resolve_template_types(db, resolved)
+}
+
+/// Conditionals in generic args, as in `@return static<($keyBy is string ? array-key : TNewKey), TValue>`.
+fn resolve_conditional_type_args(
+    atomic: mir_types::Atomic,
+    db: &dyn crate::db::MirDatabase,
+    templates: Option<&rustc_hash::FxHashMap<mir_types::Name, mir_types::Type>>,
+    lookup: &dyn Fn(&str) -> Option<mir_types::Type>,
+) -> mir_types::Atomic {
+    match atomic {
+        mir_types::Atomic::TNamedObject { fqcn, type_params }
+            if type_params.iter().any(|t| {
+                t.types
+                    .iter()
+                    .any(|a| matches!(a, mir_types::Atomic::TConditional { .. }))
+            }) =>
+        {
+            mir_types::Atomic::TNamedObject {
+                fqcn,
+                type_params: type_params
+                    .iter()
+                    .map(|t| resolve_conditional_dyn(t.clone(), db, templates, lookup))
+                    .collect::<Vec<_>>()
+                    .into(),
+            }
+        }
+        other => other,
+    }
 }
 
 /// The chosen branch of a conditional whose subject names a class, resolved through `is_subtype`.

@@ -126,7 +126,7 @@ impl DocblockParser {
                         if let Some(msg) = validate_type_str(&ty_s, "return") {
                             result.invalid_annotations.push(msg);
                         }
-                        result.return_type = Some(parse_type_string(&ty_s));
+                        result.return_type = Some(parse_type_string_keeping_static_args(&ty_s));
                         if capture_descriptions {
                             let desc = description_after(&body_str, &ty_s);
                             if !desc.is_empty() {

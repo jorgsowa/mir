@@ -438,6 +438,26 @@ fn substitute_static_atom(
                 static_atom,
             )),
         },
+        // `static<A, B>` on a raw receiver, or with args that don't fit its template slots, reads as bare `static`.
+        Atomic::TNamedObject {
+            fqcn: ref obj_fqcn,
+            ref type_params,
+        } if obj_fqcn.as_ref() == "static"
+            && (receiver_type_params.is_empty()
+                || crate::db::class_template_params(db, static_fqcn)
+                    .is_none_or(|tps| tps.len() != type_params.len())) =>
+        {
+            substitute_static_atom(
+                db,
+                Atomic::TStaticObject {
+                    fqcn: Name::from(""),
+                },
+                fqcn,
+                static_fqcn,
+                receiver_type_params,
+                static_atom,
+            )
+        }
         // `self<T>`/`static<T>`/`parent<T>`/`$this<T>` sentinel written in a
         // self-out annotation (see `parse_self_out_type` in the docblock
         // parser) — unlike a bare `TSelf`/`TStaticObject`, this carries the
@@ -521,6 +541,73 @@ fn substitute_static_atom(
         }
         other => other,
     }
+}
+
+/// Whether `ty` holds a `static<...>` sentinel from a return docblock.
+pub(crate) fn has_generic_static(ty: &Type) -> bool {
+    ty.types.iter().any(|a| match a {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            fqcn.as_ref() == "static" || type_params.iter().any(has_generic_static)
+        }
+        Atomic::TConditional { data } => {
+            has_generic_static(&data.if_true) || has_generic_static(&data.if_false)
+        }
+        _ => false,
+    })
+}
+
+/// Drops the members of each type arg its template's bound excludes; a class never holds them.
+pub(crate) fn clamp_type_args_to_bounds(db: &dyn MirDatabase, ty: Type) -> Type {
+    let clamp_atomic = |a: Atomic| -> Atomic {
+        let Atomic::TNamedObject { fqcn, type_params } = a else {
+            return a;
+        };
+        let Some(tps) = crate::db::class_template_params(db, fqcn.as_ref())
+            .filter(|tps| tps.len() == type_params.len())
+        else {
+            return Atomic::TNamedObject { fqcn, type_params };
+        };
+        let clamped: Vec<Type> = type_params
+            .iter()
+            .zip(tps.iter())
+            .map(|(arg, tp)| {
+                let Some(bound) = tp.bound.as_deref().filter(|b| {
+                    !b.is_mixed()
+                        && !b
+                            .types
+                            .iter()
+                            .any(|a| matches!(a, Atomic::TTemplateParam { .. }))
+                }) else {
+                    return arg.clone();
+                };
+                if arg.is_mixed() || crate::subtype::is_subtype(db, arg, bound) {
+                    return arg.clone();
+                }
+                let mut kept = Type::empty();
+                for member in &arg.types {
+                    if crate::subtype::is_subtype(db, &Type::single(member.clone()), bound) {
+                        kept.add_type(member.clone());
+                    }
+                }
+                if kept.types.is_empty() {
+                    bound.clone()
+                } else {
+                    kept
+                }
+            })
+            .collect();
+        Atomic::TNamedObject {
+            fqcn,
+            type_params: mir_types::union::vec_to_type_params(clamped),
+        }
+    };
+    let mut result = Type::empty();
+    result.from_docblock = ty.from_docblock;
+    result.possibly_undefined = ty.possibly_undefined;
+    for atomic in ty.types {
+        result.add_type(clamp_atomic(atomic));
+    }
+    result
 }
 
 /// Replace `TStaticObject` (and a trait's `TSelf`) in a method's return type with the actual receiver FQCN.

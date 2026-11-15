@@ -1,7 +1,7 @@
 use super::*;
 use crate::expr::helpers::canonical_int_array_key;
 use mir_types::StringRefinement;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 fn associative_array_marker() -> Type {
     Type::single(Atomic::TKeyedArray {
@@ -1011,6 +1011,16 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 value: Box::new(value),
             })
         }
+        // In a return type, `static<A, B>` keeps its args in a `static` sentinel the call site resolves.
+        "static" if KEEP_STATIC_ARGS.with(Cell::get) => Type::single(Atomic::TNamedObject {
+            fqcn: mir_types::Name::from("static"),
+            type_params: mir_types::union::vec_to_type_params(
+                split_generics(inner)
+                    .iter()
+                    .map(|p| parse_type_string(p.trim()))
+                    .collect(),
+            ),
+        }),
         // `static<T>`/`parent<T>` — a common Doctrine/Collection-style
         // "generic self-referencing collection" pattern. These pseudo-type atoms
         // carry no `type_params` field of their own (unlike `TNamedObject`), so
@@ -1170,6 +1180,18 @@ fn expand_int_mask_members_uncached(members: &[i64]) -> Type {
 
 /// `(declaring class FQCN, its own literal-int constants)`.
 type SelfIntConstants = (Arc<str>, Arc<Vec<(Arc<str>, Atomic)>>);
+
+thread_local! {
+    static KEEP_STATIC_ARGS: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Parses `s` keeping the args of every `static<...>` in it.
+pub(super) fn parse_type_string_keeping_static_args(s: &str) -> Type {
+    let previous = KEEP_STATIC_ARGS.with(|cell| cell.replace(true));
+    let ty = parse_type_string(s);
+    KEEP_STATIC_ARGS.with(|cell| cell.set(previous));
+    ty
+}
 
 thread_local! {
     /// Ambient constants of the class currently being collected, so

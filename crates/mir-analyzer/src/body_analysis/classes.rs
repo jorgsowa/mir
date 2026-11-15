@@ -395,7 +395,14 @@ impl<'a> BodyAnalyzer<'a> {
                         .is_some_and(|def| def.has_native_readonly)
                     })
             };
-            if self.mode == AnalysisMode::Full && !has_docblock_type && !natively_readonly() {
+            if self.mode == AnalysisMode::Full
+                && !has_docblock_type
+                && !natively_readonly()
+                && !prop
+                    .name
+                    .as_str()
+                    .is_some_and(|n| self.overrides_untyped_parent_property(fqcn, n))
+            {
                 let prop_name = prop.name.as_str().unwrap_or("").to_string();
                 let start = crate::parser::skip_leading_attributes(source, member_span.start);
                 let (line, col_start) =
@@ -532,6 +539,21 @@ impl<'a> BodyAnalyzer<'a> {
             col_start,
             col_end,
         });
+    }
+
+    /// PHP forbids adding a type to an inherited untyped property, so a redeclaration can't have one.
+    fn overrides_untyped_parent_property(&self, fqcn: &str, name: &str) -> bool {
+        let db = self.db;
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, fqcn))
+            .and_then(|class| class.parent().cloned())
+            .and_then(|parent| {
+                crate::db::find_property_in_chain(db, crate::db::Fqcn::from_str(db, &parent), name)
+            })
+            .is_some_and(|(_, def)| {
+                !def.from_docblock
+                    && !def.has_native_type
+                    && def.visibility != mir_codebase::definitions::Visibility::Private
+            })
     }
 
     /// `UndefinedDocblockClass`/`cls:` usage for a property's `@var` docblock
@@ -1208,7 +1230,13 @@ impl<'a> BodyAnalyzer<'a> {
                             )
                         })
                         .is_some_and(|def| def.ty.is_some() || def.has_native_readonly);
-                    if typed_or_readonly || param.modifiers.is_readonly {
+                    if typed_or_readonly
+                        || param.modifiers.is_readonly
+                        || param
+                            .name
+                            .as_str()
+                            .is_some_and(|n| self.overrides_untyped_parent_property(fqcn, n))
+                    {
                         continue;
                     }
                     let prop_name = param.name.as_str().unwrap_or("").to_string();

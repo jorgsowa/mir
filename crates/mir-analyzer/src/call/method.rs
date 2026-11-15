@@ -1787,6 +1787,7 @@ fn resolve_method_return<'a>(
             }
         }
 
+        let returns_generic_static = super::args::has_generic_static(&resolved.return_ty_raw);
         let returns_this = matches!(
             resolved.return_ty_raw.types.as_slice(),
             [mir_types::Atomic::TStaticObject { .. }]
@@ -2189,6 +2190,9 @@ fn resolve_method_return<'a>(
                 )
             },
         );
+        if returns_generic_static {
+            return_ty = super::args::clamp_type_args_to_bounds(ea.db, return_ty);
+        }
         return_ty = crate::generic::bound_unbound_class_string_templates(
             return_ty,
             || crate::db::class_template_params(ea.db, resolved.template_scope.as_ref()),
