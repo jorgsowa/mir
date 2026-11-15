@@ -47,6 +47,13 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if let Some(reason) = weak_cipher_use(fn_name_lower, args) {
+        ea.emit(
+            mir_issues::IssueKind::WeakCryptography { reason },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -97,4 +104,42 @@ fn is_raw_digest(expr: &Expr) -> bool {
         _ => return false,
     };
     matches!(binary.map(|b| &b.kind), Some(ExprKind::Bool(true)))
+}
+
+// ---------------------------------------------------------------------------
+// Ciphers
+// ---------------------------------------------------------------------------
+
+fn weak_cipher_use(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+    if !matches!(fn_name_lower, "openssl_encrypt" | "openssl_decrypt") {
+        return None;
+    }
+    let cipher = literal_str(arg(args, 1, "cipher_algo")).map(str::to_ascii_lowercase);
+    if let Some(cipher) = &cipher {
+        let broken = ["des", "rc2", "rc4", "bf", "blowfish"]
+            .iter()
+            .any(|family| cipher.starts_with(family));
+        if broken {
+            return Some(format!("cipher '{cipher}' is broken"));
+        }
+        if cipher.ends_with("-ecb") {
+            return Some(format!(
+                "ECB mode of '{cipher}' leaks patterns of the plaintext"
+            ));
+        }
+    }
+    if literal_str(arg(args, 2, "passphrase")).is_some() {
+        return Some("the key is hardcoded".to_string());
+    }
+    if literal_str(arg(args, 4, "iv")).is_some_and(|iv| !iv.is_empty()) {
+        return Some("the IV is hardcoded; use a fresh random IV for every message".to_string());
+    }
+    let aead = cipher.as_deref().is_some_and(|c| {
+        ["-gcm", "-ccm", "-ocb"]
+            .iter()
+            .any(|mode| c.ends_with(mode))
+            || c == "chacha20-poly1305"
+    });
+    (fn_name_lower == "openssl_decrypt" && aead && arg(args, 5, "tag").is_none())
+        .then(|| "an AEAD cipher is decrypted without its authentication tag".to_string())
 }

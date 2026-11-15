@@ -172,6 +172,7 @@ issues keep their code.
 | MIR0813  | TaintedEval                   | [security/tainted-eval](../security/tainted-eval/) |
 | MIR0814  | TaintedUnserialize            | [security/tainted-unserialize](../security/tainted-unserialize/) |
 | MIR0815  | InsecurePasswordHash          | [security/insecure-password-hash](../security/insecure-password-hash/) |
+| MIR0816  | WeakCryptography              | [security/weak-cryptography](../security/weak-cryptography/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

@@ -1,5 +1,11 @@
 ===description===
 no PossiblyUndefinedVariable for $decrypted in chained if-with-?? fallback
+===config===
+<mir>
+  <issueHandlers>
+    <WeakCryptography errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function decrypt(bool $aead): string {
