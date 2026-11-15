@@ -212,6 +212,8 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
         | "db2_escape_string" => Taint::SQL,
         "escapeshellarg" | "escapeshellcmd" => Taint::SHELL,
         "ldap_escape" => Taint::LDAP,
+        // Output is a PHP literal that evaluates back to the value.
+        "var_export" => Taint::EVAL,
         // Strips directory components, so the value can't traverse out of its directory.
         "basename" => Taint::FILE,
         // Output is limited to `[A-Za-z0-9%+._~-]`.
@@ -223,9 +225,10 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
                 | Taint::COOKIE
                 | Taint::LDAP
                 | Taint::XPATH
+                | Taint::EVAL
         }
         // Output is limited to `[A-Za-z0-9+/=]`.
-        "base64_encode" => Taint::HTML | Taint::HEADER | Taint::COOKIE,
+        "base64_encode" => Taint::HTML | Taint::HEADER | Taint::COOKIE | Taint::EVAL,
         // Reversible: a kind stays so that a decoder finds the value tainted.
         "bin2hex" => Taint::ALL.without(Taint::LLM_PROMPT),
         "md5" | "sha1" | "crc32" | "hash" | "hash_hmac" | "password_hash" | "dechex" | "decbin"

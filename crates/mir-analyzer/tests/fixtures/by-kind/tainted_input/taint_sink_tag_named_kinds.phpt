@@ -23,6 +23,6 @@ sinks((string) $_GET['f'], 'x', 'x', 'x');
 sinks('x', (string) $_GET['i'], 'x', 'x');
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInclude: Tainted include path — possible file inclusion
 sinks('x', 'x', (string) $_GET['e'], 'x');
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedEval: Tainted eval() code — possible code injection
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedEval: Tainted code — possible code injection
 sinks('x', 'x', 'x', (string) $_GET['u']);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedUnserialize: Tainted unserialize() payload — possible object injection

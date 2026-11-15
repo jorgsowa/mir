@@ -125,6 +125,7 @@ pub enum SinkKind {
     Xpath,       // XPath expressions → XPath injection
     Callable,    // callbacks and dynamic calls → arbitrary code paths
     Xml,         // XML parsed with entity expansion → XXE / XML denial of service
+    Eval,        // code that will run: PHP files written, templates compiled → code injection
 }
 
 impl SinkKind {
@@ -143,6 +144,7 @@ impl SinkKind {
             SinkKind::Xpath => IssueKind::TaintedXpath,
             SinkKind::Callable => IssueKind::TaintedCallable,
             SinkKind::Xml => IssueKind::TaintedXml,
+            SinkKind::Eval => IssueKind::TaintedEval,
         }
     }
 
@@ -160,6 +162,7 @@ impl SinkKind {
             SinkKind::Xpath => Taint::XPATH,
             SinkKind::Callable => Taint::CALLABLE,
             SinkKind::Xml => Taint::OTHER,
+            SinkKind::Eval => Taint::EVAL,
         }
     }
 }
@@ -367,8 +370,42 @@ pub fn option_sink_values<'e>(
             .map(|v| (v, SinkKind::Xml))
             .into_iter()
             .collect(),
+        "file_put_contents" => match (
+            args.first()
+                .filter(|a| a.name.is_none())
+                .and_then(|a| a.value()),
+            args.get(1)
+                .filter(|a| a.name.is_none())
+                .and_then(|a| a.value()),
+        ) {
+            (Some(path), Some(data)) if has_php_extension(path) => vec![(data, SinkKind::Eval)],
+            _ => Vec::new(),
+        },
         _ => Vec::new(),
     }
+}
+
+/// A path whose literal end names a PHP script: `$dir . '/config.php'`, `"cache/$key.phtml"`.
+fn has_php_extension(path: &Expr) -> bool {
+    let mut last = unwrap_parens(path);
+    while let ExprKind::Binary(b) = &last.kind {
+        if b.op != php_ast::ast::BinaryOp::Concat {
+            break;
+        }
+        last = unwrap_parens(&b.right);
+    }
+    let text = match &last.kind {
+        ExprKind::String(s) => s.as_str(),
+        ExprKind::InterpolatedString(parts) => match parts.last() {
+            Some(StringPart::Literal(s)) => s.as_str(),
+            _ => return false,
+        },
+        _ => return false,
+    };
+    let text = text.to_ascii_lowercase();
+    [".php", ".phtml", ".phar", ".pht"]
+        .iter()
+        .any(|ext| text.ends_with(ext))
 }
 
 /// The XML argument of a parse call whose libxml flags load external entities or

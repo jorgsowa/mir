@@ -2584,7 +2584,7 @@ impl IssueKind {
             IssueKind::TaintedInclude => {
                 "Tainted include path — possible file inclusion".to_string()
             }
-            IssueKind::TaintedEval => "Tainted eval() code — possible code injection".to_string(),
+            IssueKind::TaintedEval => "Tainted code — possible code injection".to_string(),
             IssueKind::TaintedUnserialize => {
                 "Tainted unserialize() payload — possible object injection".to_string()
             }
