@@ -833,6 +833,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/insecure_cors/`.
     InsecureCors,
 
+    /// `mt_srand()` or `srand()` gets a literal or clock-based seed.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/predictable_seed/`.
+    PredictableSeed { function: String },
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1305,6 +1310,7 @@ impl IssueKind {
             | IssueKind::InsecureFilePermissions { .. }
             | IssueKind::HardcodedCredential { .. }
             | IssueKind::InsecureCors
+            | IssueKind::PredictableSeed { .. }
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1598,6 +1604,7 @@ impl IssueKind {
             IssueKind::InsecureFilePermissions { .. } => "MIR0836",
             IssueKind::HardcodedCredential { .. } => "MIR0837",
             IssueKind::InsecureCors => "MIR0838",
+            IssueKind::PredictableSeed { .. } => "MIR0839",
             IssueKind::TaintedInput { .. } => "MIR0800",
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
@@ -1729,7 +1736,7 @@ impl IssueKind {
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
             | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" | "MIR0820"
             | "MIR0821" | "MIR0822" | "MIR0825" | "MIR0826" | "MIR0827" | "MIR0831" | "MIR0832"
-            | "MIR0833" | "MIR0834" | "MIR0835" | "MIR0836" | "MIR0837" | "MIR0838" => {
+            | "MIR0833" | "MIR0834" | "MIR0835" | "MIR0836" | "MIR0837" | "MIR0838" | "MIR0839" => {
                 Some(Severity::Warning)
             }
 
@@ -1936,6 +1943,7 @@ impl IssueKind {
             IssueKind::InsecureFilePermissions { .. } => "InsecureFilePermissions",
             IssueKind::HardcodedCredential { .. } => "HardcodedCredential",
             IssueKind::InsecureCors => "InsecureCors",
+            IssueKind::PredictableSeed { .. } => "PredictableSeed",
             IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
@@ -2710,6 +2718,7 @@ impl IssueKind {
             IssueKind::InsecureFilePermissions { reason } => format!("Insecure file permissions: {reason}"),
             IssueKind::HardcodedCredential { what } => format!("Hard-coded credential: {what} is written in the source"),
             IssueKind::InsecureCors => "CORS reflects the request's Origin while allowing credentials — any site can read authenticated responses".to_string(),
+            IssueKind::PredictableSeed { function } => format!("{function}() seeds the generator with a guessable value, so every mt_rand() and rand() result after it is predictable"),
             IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
@@ -3566,6 +3575,7 @@ mod code_tests {
                 method: s(),
             },
             IssueKind::MissingSensitiveParameter { param: s() },
+            IssueKind::PredictableSeed { function: s() },
             IssueKind::InsecureCors,
             IssueKind::HardcodedCredential { what: s() },
             IssueKind::InsecureFilePermissions { reason: s() },
@@ -3782,6 +3792,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 219);
+        assert_eq!(one_of_each().len(), 220);
     }
 }

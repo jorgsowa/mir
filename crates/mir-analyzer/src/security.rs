@@ -109,6 +109,17 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if matches!(fn_name_lower, "mt_srand" | "srand")
+        && arg(args, 0, "seed").is_some_and(is_predictable_seed)
+    {
+        ea.emit(
+            mir_issues::IssueKind::PredictableSeed {
+                function: fn_name_lower.to_string(),
+            },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(what) = hardcoded_password(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::HardcodedCredential { what },
@@ -326,6 +337,35 @@ fn reads_request_parameter(expr: &Expr) -> bool {
 // ---------------------------------------------------------------------------
 // Randomness
 // ---------------------------------------------------------------------------
+
+/// A seed an attacker can guess: a literal, or built from the clock or process ID.
+fn is_predictable_seed(seed: &Expr) -> bool {
+    use php_ast::ast::BinaryOp;
+    match &seed.kind {
+        ExprKind::Int(_) => true,
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => is_predictable_seed(inner),
+        ExprKind::FunctionCall(fc) => named_one_of(
+            &fc.name,
+            &["time", "microtime", "hrtime", "getmypid", "date", "mktime"],
+        ),
+        ExprKind::Binary(b)
+            if matches!(
+                b.op,
+                BinaryOp::Add
+                    | BinaryOp::Sub
+                    | BinaryOp::Mul
+                    | BinaryOp::Div
+                    | BinaryOp::Mod
+                    | BinaryOp::BitwiseXor
+                    | BinaryOp::BitwiseOr
+                    | BinaryOp::BitwiseAnd
+            ) =>
+        {
+            is_predictable_seed(&b.left) && is_predictable_seed(&b.right)
+        }
+        _ => false,
+    }
+}
 
 /// Report a guessable random value returned from a function named for a secret.
 pub(crate) fn check_weak_random_return(
