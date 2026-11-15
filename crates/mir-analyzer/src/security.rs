@@ -98,6 +98,13 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if let Some(what) = hardcoded_password(fn_name_lower, args) {
+        ea.emit(
+            mir_issues::IssueKind::HardcodedCredential { what },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(reason) = world_writable_mode(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::InsecureFilePermissions { reason },
@@ -1190,4 +1197,106 @@ fn world_writable_mode(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
             }),
         _ => None,
     }
+}
+
+// ---------------------------------------------------------------------------
+// Hard-coded credentials
+// ---------------------------------------------------------------------------
+
+/// Report misuse visible in the arguments of `new Class(...)`.
+pub(crate) fn check_constructor_call(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    fqcn: &str,
+    args: &[Arg],
+    span: php_ast::Span,
+) {
+    let class = fqcn.trim_start_matches('\\');
+    let takes_password = class.eq_ignore_ascii_case("PDO") || class.eq_ignore_ascii_case("mysqli");
+    if takes_password && is_password_literal(arg(args, 2, "password")) {
+        ea.emit(
+            mir_issues::IssueKind::HardcodedCredential {
+                what: format!("the password passed to new {class}()"),
+            },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+fn is_password_literal(expr: Option<&Expr>) -> bool {
+    literal_str(expr).is_some_and(|s| !s.is_empty())
+}
+
+/// A literal password at a builtin's password parameter, or in a `pg_connect()` string.
+fn hardcoded_password(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+    let password = match fn_name_lower {
+        "mysqli_connect" | "ldap_bind" => arg(args, 2, "password"),
+        "mysqli_real_connect" => arg(args, 3, "password"),
+        "oci_connect" | "oci_pconnect" | "oci_new_connect" => arg(args, 1, "password"),
+        "pg_connect" | "pg_pconnect" => {
+            let conn = literal_str(arg(args, 0, "connection_string"))?;
+            let value = conn
+                .split_whitespace()
+                .find_map(|p| p.strip_prefix("password="))?;
+            return (!value.is_empty() && value != "''")
+                .then(|| format!("the password in the {fn_name_lower}() connection string"));
+        }
+        _ => return None,
+    };
+    is_password_literal(password).then(|| format!("the password passed to {fn_name_lower}()"))
+}
+
+/// Report a string literal shaped like a live secret: an AWS access key ID, a private key or a
+/// Stripe live secret key.
+pub(crate) fn check_secret_literal(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    text: &str,
+    span: php_ast::Span,
+) {
+    if text.len() < 20 {
+        return;
+    }
+    if let Some(what) = secret_shape(text) {
+        ea.emit(
+            mir_issues::IssueKind::HardcodedCredential {
+                what: what.to_string(),
+            },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+fn secret_shape(text: &str) -> Option<&'static str> {
+    let alnum = |s: &str| s.bytes().all(|b| b.is_ascii_alphanumeric());
+    let upper_alnum = |s: &str| {
+        s.bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+    };
+    if text.len() == 20
+        && (text.starts_with("AKIA") || text.starts_with("ASIA"))
+        && upper_alnum(text)
+        && !text.contains("EXAMPLE")
+    {
+        return Some("an AWS access key ID");
+    }
+    for prefix in ["sk_live_", "rk_live_"] {
+        if let Some(rest) = text.strip_prefix(prefix) {
+            if rest.len() >= 24 && alnum(rest) {
+                return Some("a Stripe live secret key");
+            }
+        }
+    }
+    if let Some(start) = text.find("-----BEGIN ") {
+        let header_end = text[start..].find("PRIVATE KEY-----")? + start + "PRIVATE KEY-----".len();
+        let body: usize = text[header_end..]
+            .bytes()
+            .take_while(|b| *b != b'-')
+            .filter(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
+            .count();
+        if body >= 64 {
+            return Some("a private key");
+        }
+    }
+    None
 }

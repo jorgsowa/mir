@@ -655,11 +655,13 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn analyze_inner(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
         match &expr.kind {
             // --- Literals ---------------------------------------------------
-            ExprKind::Int(_)
-            | ExprKind::Float(_)
-            | ExprKind::String(_)
-            | ExprKind::Bool(_)
-            | ExprKind::Null => literals::analyze(&expr.kind),
+            ExprKind::String(s) => {
+                crate::security::check_secret_literal(self, s.as_str(), expr.span);
+                literals::analyze(&expr.kind)
+            }
+            ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) | ExprKind::Null => {
+                literals::analyze(&expr.kind)
+            }
 
             ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) => {
                 // A heredoc (or, in principle, a double-quoted string) with no
@@ -691,6 +693,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
                 if all_literal {
+                    crate::security::check_secret_literal(self, &literal, expr.span);
                     Type::single(Atomic::TLiteralString(literal.into()))
                 } else if parts_literal_text {
                     crate::expr::helpers::literal_string(any_non_empty_literal)
@@ -705,6 +708,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             ExprKind::Nowdoc(nowdoc) => {
+                crate::security::check_secret_literal(self, nowdoc.value.as_ref(), expr.span);
                 Type::single(Atomic::TLiteralString(nowdoc.value.as_ref().into()))
             }
             ExprKind::ShellExec(parts) => {

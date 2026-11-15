@@ -312,6 +312,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::taint::check_mongo_filter(self, filter, ctx, span);
                     }
                 }
+                crate::security::check_constructor_call(self, &fqcn, &n.args, span);
                 if crate::taint::runs_program_directly(self.db, &fqcn) {
                     if let Some(command) = n.args.first().and_then(|a| a.value()) {
                         crate::taint::check_command_arguments(self, command, ctx, span);
