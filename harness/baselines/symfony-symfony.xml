@@ -1932,4 +1932,14 @@
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>
   </file>
+  <file src="src/Symfony/Component/Runtime/GenericRuntime.php">
+    <InsecureFilePermissions>
+      <code><![CDATA[umask(0o000)]]></code>
+    </InsecureFilePermissions>
+  </file>
+  <file src="src/Symfony/Component/Lock/Store/FlockStore.php">
+    <InsecureFilePermissions>
+      <code><![CDATA[chmod($fileName, 0o666)]]></code>
+    </InsecureFilePermissions>
+  </file>
 </files>

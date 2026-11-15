@@ -98,6 +98,13 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if let Some(reason) = world_writable_mode(fn_name_lower, args) {
+        ea.emit(
+            mir_issues::IssueKind::InsecureFilePermissions { reason },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(reason) = password_hash_misuse(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::InsecurePasswordHash { reason },
@@ -1157,5 +1164,30 @@ pub(crate) fn check_ldap_bind(
             mir_issues::Severity::Warning,
             span,
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// File permissions
+// ---------------------------------------------------------------------------
+
+/// `chmod()` to a literal mode, or `umask()` to a literal mask, that leaves files writable by
+/// every user. `mkdir()` isn't checked: the umask applies to its mode, which defaults to 0777.
+fn world_writable_mode(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+    const OTHERS_WRITE: i64 = 0o002;
+    let literal = |e: Option<&Expr>| match e.map(|e| &e.kind) {
+        Some(ExprKind::Int(i)) => Some(*i),
+        _ => None,
+    };
+    match fn_name_lower {
+        "chmod" => literal(arg(args, 1, "permissions"))
+            .filter(|mode| mode & OTHERS_WRITE != 0)
+            .map(|mode| format!("chmod() mode {mode:04o} lets every user on the system write the file")),
+        "umask" => literal(arg(args, 0, "mask"))
+            .filter(|mask| mask & OTHERS_WRITE == 0)
+            .map(|mask| {
+                format!("umask({mask:04o}) lets every user on the system write the files and directories created after it")
+            }),
+        _ => None,
     }
 }

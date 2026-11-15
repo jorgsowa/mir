@@ -1237,6 +1237,11 @@
     <UndefinedTrait>
       <code><![CDATA[]]></code>
     </UndefinedTrait>
+    <InsecureFilePermissions>
+      <code><![CDATA[chmod($filename, 0666)]]></code>
+      <code><![CDATA[chmod($filename, 0666)]]></code>
+      <code><![CDATA[chmod(DRUPAL_ROOT . '/' . $this->siteDirectory, 0777)]]></code>
+    </InsecureFilePermissions>
   </file>
   <file src="core/lib/Drupal/Core/Test/JUnitConverter.php">
     <UndefinedClass>
@@ -4477,5 +4482,15 @@
     <UndefinedConstant>
       <code><![CDATA[SAVED_UPDATED]]></code>
     </UndefinedConstant>
+  </file>
+  <file src="core/lib/Drupal/Component/PhpStorage/FileStorage.php">
+    <InsecureFilePermissions>
+      <code><![CDATA[chmod($path, 0777)]]></code>
+    </InsecureFilePermissions>
+  </file>
+  <file src="core/lib/Drupal/Component/PhpStorage/MTimeProtectedFastFileStorage.php">
+    <InsecureFilePermissions>
+      <code><![CDATA[chmod($directory, 0777)]]></code>
+    </InsecureFilePermissions>
   </file>
 </files>
