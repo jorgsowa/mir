@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance: unused-assignment tracking keeps overwritten writes in an insertion-ordered set, so merging branches extends it with what the other branch added instead of rebuilding a hash set and copying the list, and `int-mask-of<...>` unions are expanded once per member set (SimplePie's `Item` 13% fewer instructions).
 - Performance: return-type inference and taint summaries skip argument type checks, whose issues they discard (WordPress about 1.5% fewer instructions).
 
+### Fixed
+
+- `filter_var($x, FILTER_VALIDATE_IP)` and `filter_input(..., FILTER_VALIDATE_IP)` no longer clear SSRF taint, since a valid IP can be a loopback, private or cloud metadata address. Passing `FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE` or `FILTER_FLAG_GLOBAL_RANGE` still clears it.
+
 ## [0.101.0] - 2026-11-14
 
 ### Added
