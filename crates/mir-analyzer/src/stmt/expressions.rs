@@ -38,6 +38,17 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
+    /// Report a `Location` redirect whose page goes on to send output: no `exit` stopped it.
+    pub(super) fn report_output_after_redirect(&mut self, ctx: &mut FlowState) {
+        if let Some(redirect) = ctx.redirect_pending.take() {
+            self.expr_analyzer(ctx).emit(
+                IssueKind::CodeAfterRedirect,
+                mir_issues::Severity::Warning,
+                redirect,
+            );
+        }
+    }
+
     /// Emit `DocblockTypeContradiction` when `cond` is a comparison that a
     /// docblock-derived type makes impossible.
     pub(super) fn check_docblock_contradiction(&mut self, cond: &Expr, ctx: &mut FlowState) {

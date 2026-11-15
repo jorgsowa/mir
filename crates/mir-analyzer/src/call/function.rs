@@ -603,6 +603,9 @@ impl CallAnalyzer {
             if let Some(non_html) = crate::taint::header_sets_non_html(&call.args) {
                 ctx.non_html_response = non_html;
             }
+            if ctx.redirect_pending.is_none() && crate::security::is_location_header(&call.args) {
+                ctx.redirect_pending = Some(span);
+            }
         }
 
         // Pre-mark by-reference parameter variables as defined BEFORE evaluating args

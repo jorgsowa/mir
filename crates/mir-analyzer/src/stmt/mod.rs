@@ -727,6 +727,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
             // ---- Echo ---------------------------------------------------------
             StmtKind::Echo(exprs) => {
+                self.report_output_after_redirect(ctx);
                 self.analyze_echo_stmt(exprs, stmt.span, ctx);
             }
 
@@ -835,6 +836,10 @@ impl<'a> StatementsAnalyzer<'a> {
                 for item in items.iter() {
                     self.record_global_const_decl_name(item);
                 }
+            }
+
+            StmtKind::InlineHtml(html) if !html.trim().is_empty() => {
+                self.report_output_after_redirect(ctx);
             }
 
             // ---- Inert --------------------------------------------------------

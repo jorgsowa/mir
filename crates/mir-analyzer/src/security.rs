@@ -914,3 +914,31 @@ pub(crate) fn is_spoofable_ip(expr: &Expr, ctx: &FlowState) -> bool {
         _ => false,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Redirects
+// ---------------------------------------------------------------------------
+
+/// `header('Location: ...')`, whose literal text starts the header.
+pub(crate) fn is_location_header(args: &[Arg]) -> bool {
+    let Some(mut first) = arg(args, 0, "header") else {
+        return false;
+    };
+    while let ExprKind::Binary(b) = &first.kind {
+        if b.op != php_ast::ast::BinaryOp::Concat {
+            break;
+        }
+        first = &b.left;
+    }
+    let text = match &first.kind {
+        ExprKind::String(s) => s.as_str(),
+        ExprKind::InterpolatedString(parts) => match parts.first() {
+            Some(php_ast::owned::StringPart::Literal(s)) => s.as_str(),
+            _ => return false,
+        },
+        _ => return false,
+    };
+    text.trim_start()
+        .to_ascii_lowercase()
+        .starts_with("location:")
+}

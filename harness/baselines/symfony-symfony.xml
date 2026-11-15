@@ -1870,6 +1870,9 @@
       <code><![CDATA[header('Location: '.$location, true, 302)]]></code>
       <code><![CDATA[header($header)]]></code>
     </TaintedHeader>
+    <CodeAfterRedirect>
+      <code><![CDATA[header('Location: http://localhost:8057/post', true, 307)]]></code>
+    </CodeAfterRedirect>
   </file>
   <file src="src/Symfony/Contracts/HttpClient/Test/HttpClientTestCase.php">
     <InvalidArgument>

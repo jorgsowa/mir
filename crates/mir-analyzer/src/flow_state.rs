@@ -373,6 +373,9 @@ pub struct FlowState {
     /// Set while narrowing from `assert()`, whose check production builds compile out.
     pub ignore_taint_guards: bool,
 
+    /// A `header('Location: ...')` call no `exit` has followed on some path to here.
+    pub redirect_pending: Option<php_ast::Span>,
+
     /// `(slot, name)` of each by-ref parameter whose exit taint the summary records.
     pub byref_out_slots: Arc<[(usize, Name)]>,
 
@@ -869,6 +872,7 @@ impl FlowState {
             taint_trails: Arc::default(),
             summarizing_taint: false,
             ignore_taint_guards: false,
+            redirect_pending: None,
             byref_out_slots: Arc::default(),
             param_parts: Arc::default(),
             plain_vars: Arc::default(),
@@ -3123,6 +3127,7 @@ impl FlowState {
         result.this_escaped_to_call = this_escaped;
         result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
         result.non_html_response = if_ctx.non_html_response && else_ctx.non_html_response;
+        result.redirect_pending = if_ctx.redirect_pending.or(else_ctx.redirect_pending);
 
         // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
         for name in if_ctx
