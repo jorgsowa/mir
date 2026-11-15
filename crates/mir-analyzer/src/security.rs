@@ -47,6 +47,13 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if let Some(reason) = insecure_session_setting(fn_name_lower, args) {
+        ea.emit(
+            mir_issues::IssueKind::InsecureSessionConfig { reason },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(reason) = weak_cipher_use(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::WeakCryptography { reason },
@@ -142,4 +149,66 @@ fn weak_cipher_use(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
     });
     (fn_name_lower == "openssl_decrypt" && aead && arg(args, 5, "tag").is_none())
         .then(|| "an AEAD cipher is decrypted without its authentication tag".to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Session settings
+// ---------------------------------------------------------------------------
+
+fn insecure_session_setting(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+    match fn_name_lower {
+        "ini_set" => {
+            let name = literal_str(arg(args, 0, "option"))?.to_ascii_lowercase();
+            weakened_session_setting(name.strip_prefix("session.")?, arg(args, 1, "value")?)
+        }
+        "session_id" if arg(args, 0, "id").is_some_and(reads_request_parameter) => Some(
+            "session_id() takes the ID from a request parameter (session fixation)".to_string(),
+        ),
+        "session_start" => {
+            let ExprKind::Array(entries) = &arg(args, 0, "options")?.kind else {
+                return None;
+            };
+            entries.iter().find_map(|entry| {
+                let key = literal_str(entry.key.as_ref())?.to_ascii_lowercase();
+                weakened_session_setting(&key, entry.value())
+            })
+        }
+        _ => None,
+    }
+}
+
+/// The reason a literal `value` for session setting `name` weakens the session.
+fn weakened_session_setting(name: &str, value: &Expr) -> Option<String> {
+    let enabled = match &value.kind {
+        ExprKind::Bool(b) => *b,
+        ExprKind::Int(i) => *i != 0,
+        ExprKind::String(s) => match s.as_str().to_ascii_lowercase().as_str() {
+            "1" | "on" | "true" | "yes" => true,
+            "0" | "off" | "false" | "no" | "" => false,
+            _ => return None,
+        },
+        _ => return None,
+    };
+    match (name, enabled) {
+        ("use_strict_mode" | "use_only_cookies" | "cookie_httponly", false) => {
+            Some(format!("session.{name} is turned off"))
+        }
+        ("use_trans_sid", true) => {
+            Some("session.use_trans_sid puts the session ID in URLs".to_string())
+        }
+        _ => None,
+    }
+}
+
+/// `$_GET['x']`, `$_POST['x']` or `$_REQUEST['x']`, possibly cast or with a `??` fallback.
+fn reads_request_parameter(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::ArrayAccess(aa) => {
+            matches!(&aa.array.kind, ExprKind::Variable(v) if matches!(&**v, "_GET" | "_POST" | "_REQUEST"))
+                || reads_request_parameter(&aa.array)
+        }
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => reads_request_parameter(inner),
+        ExprKind::NullCoalesce(nc) => reads_request_parameter(&nc.left),
+        _ => false,
+    }
 }
