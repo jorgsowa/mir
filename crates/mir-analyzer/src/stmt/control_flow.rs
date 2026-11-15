@@ -518,6 +518,7 @@ impl<'a> StatementsAnalyzer<'a> {
         );
         // An array's keys are ints or strings, unlike a Traversable's.
         let key_is_plain = !arr_ty.types.is_empty() && arr_ty.types.iter().all(Atomic::is_array);
+        let from_request = crate::security::is_request_input(&fe.expr, ctx);
 
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
@@ -529,6 +530,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 entry.taint_var(var_name, key_taint);
                 if key_is_plain {
                     entry.mark_plain(var_name);
+                }
+                if from_request {
+                    entry.mark_value_origin(var_name, crate::flow_state::ValueOrigin::RequestInput);
                 }
                 // Emit ResolvedSymbol for key variable at binding position
                 self.record_symbol_for_var(key_expr.span, var_name, key_ty.clone());
@@ -643,6 +647,12 @@ impl<'a> StatementsAnalyzer<'a> {
                         iter.taint_var(var_name, key_taint);
                         if key_is_plain {
                             iter.mark_plain(var_name);
+                        }
+                        if from_request {
+                            iter.mark_value_origin(
+                                var_name,
+                                crate::flow_state::ValueOrigin::RequestInput,
+                            );
                         }
                     }
                 }

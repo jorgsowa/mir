@@ -219,6 +219,33 @@ fn weakened_session_setting(name: &str, value: &Expr) -> Option<String> {
     }
 }
 
+/// A request superglobal or a value read from one, possibly cast, trimmed or with a `??`
+/// fallback, or a variable holding such a value.
+pub(crate) fn is_request_input(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(v) => {
+            matches!(
+                v.trim_start_matches('$'),
+                "_GET" | "_POST" | "_REQUEST" | "_COOKIE"
+            ) || ctx.has_value_origin(v, ValueOrigin::RequestInput)
+        }
+        ExprKind::ArrayAccess(aa) => is_request_input(&aa.array, ctx),
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => is_request_input(inner, ctx),
+        ExprKind::NullCoalesce(nc) => is_request_input(&nc.left, ctx),
+        ExprKind::FunctionCall(fc) => {
+            named_one_of(
+                &fc.name,
+                &["trim", "intval", "strval", "wp_unslash", "stripslashes"],
+            ) && fc
+                .args
+                .first()
+                .and_then(|a| a.value())
+                .is_some_and(|v| is_request_input(v, ctx))
+        }
+        _ => false,
+    }
+}
+
 /// `$_GET['x']`, `$_POST['x']` or `$_REQUEST['x']`, possibly cast or with a `??` fallback.
 fn reads_request_parameter(expr: &Expr) -> bool {
     match &expr.kind {

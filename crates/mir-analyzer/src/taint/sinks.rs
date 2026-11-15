@@ -58,6 +58,11 @@ pub fn check_call_sinks(
     summary: impl FnOnce(&dyn crate::db::MirDatabase, &str) -> Option<TaintSummary>,
     span: php_ast::Span,
 ) {
+    if params.len() >= 2 || params.iter().any(|p| p.is_variadic) {
+        for spread in args.iter().filter(|a| a.unpack()).filter_map(|a| a.value()) {
+            check_named_arg_spread(ea, spread, ctx, span);
+        }
+    }
     let annotated = annotated_param_sinks(params, sink_params);
     let mut callee = TaintSummary::default();
     if !demanding_taint(args_value_taint(args, ctx, ea.db, &ea.file), ctx).is_empty()
@@ -721,4 +726,101 @@ pub fn header_sets_non_html(args: &[php_ast::owned::Arg]) -> Option<bool> {
             "application/json" | "text/plain" | "text/csv" | "application/octet-stream"
         ) || (media.starts_with("application/") && media.ends_with("+json")),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Mass assignment
+// ---------------------------------------------------------------------------
+
+/// Report a write whose target name user input chooses: `$obj->$k = $v`, `$$k = $v`,
+/// `$_SESSION[$k] = $v`.
+pub fn check_mass_assignment(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    target: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let (name, what) = match &target.kind {
+        ExprKind::PropertyAccess(pa) => (&pa.property, "property name"),
+        ExprKind::VariableVariable(inner) => (&**inner, "variable name"),
+        ExprKind::ArrayAccess(aa) if matches!(&aa.array.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_SESSION") => {
+            match &aa.index {
+                Some(index) => (index, "$_SESSION key"),
+                None => return,
+            }
+        }
+        _ => return,
+    };
+    if has_literal_prefix(name) || !crate::security::is_request_input(name, ctx) {
+        return;
+    }
+    if expr_taint(name, ctx, ea.db, &ea.file)
+        .concrete()
+        .intersects(Taint::CALLABLE)
+    {
+        let issue = mir_issues::IssueKind::TaintedMassAssignment {
+            target: what.to_string(),
+        };
+        ea.emit_taint(issue, span, name, Taint::CALLABLE, ctx);
+    }
+}
+
+/// Report spreading an array whose keys user input chooses into a call, which PHP 8 maps to
+/// named parameters: `f(...$_POST)`.
+pub fn check_named_arg_spread(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    value: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    if crate::db::db_php_version(ea.db) < crate::php_version::PhpVersion::new(8, 0)
+        || !crate::security::is_request_input(value, ctx)
+        || !may_have_string_keys(value, ctx)
+    {
+        return;
+    }
+    let whole = expr_taint(value, ctx, ea.db, &ea.file);
+    if iteration_key_taint(value, whole, ctx, ea.db, &ea.file)
+        .concrete()
+        .intersects(Taint::CALLABLE)
+    {
+        let issue = mir_issues::IssueKind::TaintedMassAssignment {
+            target: "array keys spread into named arguments".to_string(),
+        };
+        ea.emit_taint(issue, span, value, Taint::CALLABLE, ctx);
+    }
+}
+
+/// `'prefix_' . $x` or `"prefix_$x"`: a name confined to its literal prefix.
+fn has_literal_prefix(expr: &Expr) -> bool {
+    let mut first = unwrap_parens(expr);
+    while let ExprKind::Binary(b) = &first.kind {
+        if b.op != php_ast::ast::BinaryOp::Concat {
+            break;
+        }
+        first = unwrap_parens(&b.left);
+    }
+    match &first.kind {
+        ExprKind::String(s) => !std::ptr::eq(first, unwrap_parens(expr)) && !s.is_empty(),
+        ExprKind::InterpolatedString(_) => matches!(
+            crate::ast_ext::StringPartsExt::string_parts(&first.kind).first(),
+            Some(StringPart::Literal(s)) if !s.is_empty()
+        ),
+        _ => false,
+    }
+}
+
+fn may_have_string_keys(value: &Expr, ctx: &FlowState) -> bool {
+    use mir_types::Atomic;
+    let ExprKind::Variable(name) = &unwrap_parens(value).kind else {
+        return false;
+    };
+    ctx.get_var(name).types.iter().any(|atom| match atom {
+        Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => {
+            !key.types.iter().all(|k| k.is_int())
+        }
+        Atomic::TKeyedArray { is_list, .. } => !is_list,
+        Atomic::TMixed => true,
+        _ => false,
+    })
 }

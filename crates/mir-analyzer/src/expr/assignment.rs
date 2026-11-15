@@ -443,6 +443,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         expr_span: Span,
         ctx: &mut FlowState,
     ) -> Type {
+        if self.db.taint_analysis() {
+            crate::taint::check_mass_assignment(self, &a.target, ctx, expr_span);
+        }
         let rhs_taint = crate::taint::expr_taint(&a.value, ctx, self.db, &self.file);
         let rhs_plain = !a.by_ref
             && !rhs_taint.concrete().is_empty()
@@ -654,6 +657,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             ctx.mark_value_origin(
                                 name.as_ref(),
                                 crate::flow_state::ValueOrigin::WeakRandom,
+                            );
+                        } else if !a.by_ref && crate::security::is_request_input(&a.value, ctx) {
+                            ctx.mark_value_origin(
+                                name.as_ref(),
+                                crate::flow_state::ValueOrigin::RequestInput,
                             );
                         }
                         if a.by_ref {

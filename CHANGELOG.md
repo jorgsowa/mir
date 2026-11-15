@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UnsafeUnserialize` (MIR0820, warning, opt-in): `unserialize()` of non-literal data without an `allowed_classes` restriction, which catches second-order payloads read from a database or cache. Data already reported as `TaintedUnserialize` isn't reported again.
 - `UnserializeGadget` (MIR0821, warning, opt-in): `__destruct()`, `__wakeup()`, `__unserialize()` or `__toString()` passing `$this->prop` to a file, shell, callback, `unserialize()`, network or SQL call, the gadgets that turn object injection into code execution.
 - `MissingSensitiveParameter` (MIR0822, warning, opt-in): an untyped, `string` or `mixed` parameter named `password`, `secret`, `token` or `apiKey`, or ending in one (`$newPassword`, `$accessToken`), without `#[\SensitiveParameter]`, in a function or method with a body when targeting PHP 8.2 or later.
+- `TaintedMassAssignment` (MIR0823, error): a request value choosing the name a write targets, in `$obj->$name = ...`, `$$name = ...` and `$_SESSION[$key] = ...`, and request data spread into a call with `...`, `call_user_func_array()` or `new $class(...)`, whose string keys PHP 8 binds to named parameters. A name with a literal prefix or checked against an allowlist isn't reported.
 
 ### Changed
 

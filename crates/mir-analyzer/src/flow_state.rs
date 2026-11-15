@@ -98,6 +98,8 @@ pub enum ValueOrigin {
     CanonicalPath,
     /// A value from a non-cryptographic random generator.
     WeakRandom,
+    /// A request superglobal or a value read from one.
+    RequestInput,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

@@ -317,7 +317,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 (value, kind)
             }
             ExprKind::AnonymousClass(_) => return,
-            _ => (&n.class, SinkKind::Callable),
+            _ => {
+                for spread in n
+                    .args
+                    .iter()
+                    .filter(|a| a.unpack())
+                    .filter_map(|a| a.value())
+                {
+                    crate::taint::check_named_arg_spread(self, spread, ctx, span);
+                }
+                (&n.class, SinkKind::Callable)
+            }
         };
         let issue = kind.issue();
         if crate::taint::reaches_sink(

@@ -872,6 +872,11 @@ impl CallAnalyzer {
                 span,
             );
             crate::taint::check_callback_sinks(ea, &fn_name_lower, &call.args, ctx, span);
+            if fn_name_lower == "call_user_func_array" {
+                if let Some(args) = call.args.get(1).and_then(|a| a.value()) {
+                    crate::taint::check_named_arg_spread(ea, args, ctx, span);
+                }
+            }
 
             if ctx.is_in_pure_fn
                 && !is_pure

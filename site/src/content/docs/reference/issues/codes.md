@@ -179,6 +179,7 @@ issues keep their code.
 | MIR0820  | UnsafeUnserialize             | [security/unsafe-unserialize](../security/unsafe-unserialize/) |
 | MIR0821  | UnserializeGadget             | [security/unserialize-gadget](../security/unserialize-gadget/) |
 | MIR0822  | MissingSensitiveParameter     | [security/missing-sensitive-parameter](../security/missing-sensitive-parameter/) |
+| MIR0823  | TaintedMassAssignment         | [security/tainted-mass-assignment](../security/tainted-mass-assignment/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |
