@@ -24,6 +24,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
         self.check_docblock_contradiction(&if_stmt.condition, ctx);
+        crate::security::check_condition(&mut self.expr_analyzer(ctx), &if_stmt.condition, ctx);
         let pre_diverges = ctx.diverges;
 
         let mut then_ctx = ctx.branch();
@@ -101,6 +102,11 @@ impl<'a> StatementsAnalyzer<'a> {
             // `!== null` check look like an always-true tautology.
             self.expr_analyzer(&pre_elseif)
                 .analyze(&elseif.condition, &mut pre_elseif);
+            crate::security::check_condition(
+                &mut self.expr_analyzer(&pre_elseif),
+                &elseif.condition,
+                &pre_elseif,
+            );
 
             let mut elseif_true_ctx = pre_elseif.clone();
             narrow_from_condition(

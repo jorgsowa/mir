@@ -780,3 +780,137 @@ fn resource_amount_arg<'e>(fn_name_lower: &str, args: &'e [Arg]) -> Option<&'e E
         _ => None,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Conditions
+// ---------------------------------------------------------------------------
+
+/// Report security decisions an `if`, `elseif` or ternary condition gets wrong.
+pub(crate) fn check_condition(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    cond: &Expr,
+    ctx: &FlowState,
+) {
+    for part in condition_parts(cond) {
+        if let Some(ip) = spoofable_ip_check(part, ctx) {
+            ea.emit(
+                mir_issues::IssueKind::SpoofableClientIp,
+                mir_issues::Severity::Warning,
+                ip.span,
+            );
+        }
+    }
+}
+
+/// The operands `&&`, `||`, `!` and parentheses combine into a condition.
+fn condition_parts(cond: &Expr) -> Vec<&Expr> {
+    match &cond.kind {
+        ExprKind::Parenthesized(inner) => condition_parts(inner),
+        ExprKind::UnaryPrefix(u) if u.op == php_ast::ast::UnaryPrefixOp::BooleanNot => {
+            condition_parts(&u.operand)
+        }
+        ExprKind::Binary(b)
+            if matches!(
+                b.op,
+                php_ast::ast::BinaryOp::BooleanAnd
+                    | php_ast::ast::BinaryOp::BooleanOr
+                    | php_ast::ast::BinaryOp::LogicalAnd
+                    | php_ast::ast::BinaryOp::LogicalOr
+            ) =>
+        {
+            let mut parts = condition_parts(&b.left);
+            parts.extend(condition_parts(&b.right));
+            parts
+        }
+        _ => vec![cond],
+    }
+}
+
+/// A client IP from a forgeable header that a comparison, list lookup or pattern match decides
+/// on: `in_array($_SERVER['HTTP_X_FORWARDED_FOR'], $allowed)`.
+fn spoofable_ip_check<'e>(check: &'e Expr, ctx: &FlowState) -> Option<&'e Expr> {
+    let is_empty_literal = |e: &Expr| match &e.kind {
+        ExprKind::String(s) => s.is_empty(),
+        ExprKind::Null | ExprKind::Bool(_) => true,
+        _ => false,
+    };
+    match &check.kind {
+        ExprKind::Binary(b)
+            if matches!(
+                b.op,
+                php_ast::ast::BinaryOp::Identical
+                    | php_ast::ast::BinaryOp::NotIdentical
+                    | php_ast::ast::BinaryOp::Equal
+                    | php_ast::ast::BinaryOp::NotEqual
+            ) =>
+        {
+            [(&b.left, &b.right), (&b.right, &b.left)]
+                .into_iter()
+                .find(|(ip, other)| is_spoofable_ip(ip, ctx) && !is_empty_literal(other))
+                .map(|(ip, _)| ip)
+        }
+        ExprKind::FunctionCall(fc) => {
+            let index = if named_one_of(
+                &fc.name,
+                &[
+                    "in_array",
+                    "array_search",
+                    "array_key_exists",
+                    "str_starts_with",
+                    "strpos",
+                    "strncmp",
+                ],
+            ) {
+                0
+            } else if named_one_of(&fc.name, &["preg_match"]) {
+                1
+            } else {
+                return None;
+            };
+            fc.args
+                .get(index)
+                .and_then(|a| a.value())
+                .filter(|ip| is_spoofable_ip(ip, ctx))
+        }
+        _ => None,
+    }
+}
+
+/// A client IP taken from `X-Forwarded-For`, `Client-IP` or `X-Real-IP`, which the client sets.
+pub(crate) fn is_spoofable_ip(expr: &Expr, ctx: &FlowState) -> bool {
+    let names_header = |key: Option<&str>| {
+        matches!(
+            key,
+            Some("HTTP_X_FORWARDED_FOR" | "HTTP_CLIENT_IP" | "HTTP_X_REAL_IP")
+        )
+    };
+    match &expr.kind {
+        ExprKind::Variable(name) => ctx.has_value_origin(name, ValueOrigin::SpoofableIp),
+        ExprKind::ArrayAccess(aa) => match &aa.array.kind {
+            ExprKind::Variable(v) if v.trim_start_matches('$') == "_SERVER" => {
+                names_header(literal_str(aa.index.as_ref()))
+            }
+            _ => is_spoofable_ip(&aa.array, ctx),
+        },
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => is_spoofable_ip(inner, ctx),
+        ExprKind::NullCoalesce(nc) => is_spoofable_ip(&nc.left, ctx),
+        ExprKind::Ternary(t) => {
+            t.then_expr
+                .as_ref()
+                .is_some_and(|e| is_spoofable_ip(e, ctx))
+                || is_spoofable_ip(&t.else_expr, ctx)
+        }
+        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, &["getenv"]) => {
+            names_header(literal_str(arg(&fc.args, 0, "name")))
+        }
+        ExprKind::FunctionCall(fc) => {
+            named_one_of(&fc.name, &["trim", "explode", "current", "reset", "strtok"])
+                && fc
+                    .args
+                    .iter()
+                    .filter_map(|a| a.value())
+                    .any(|v| is_spoofable_ip(v, ctx))
+        }
+        _ => false,
+    }
+}

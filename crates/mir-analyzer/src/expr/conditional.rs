@@ -13,6 +13,7 @@ use php_ast::owned::{Expr, ExprKind, MatchArm, MatchExpr, NullCoalesceExpr, Tern
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_ternary(&mut self, t: &TernaryExpr, ctx: &mut FlowState) -> Type {
         let cond_ty = self.analyze(&t.condition, ctx);
+        crate::security::check_condition(self, &t.condition, ctx);
         match &t.then_expr {
             Some(then_expr) => {
                 let pre_ctx = ctx.clone();

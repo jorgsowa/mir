@@ -108,6 +108,8 @@ pub enum ValueOrigin {
     ClientFileName,
     /// A value built from the request's `Host` header.
     HostHeader,
+    /// A client IP taken from a header the client can forge, such as `X-Forwarded-For`.
+    SpoofableIp,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
