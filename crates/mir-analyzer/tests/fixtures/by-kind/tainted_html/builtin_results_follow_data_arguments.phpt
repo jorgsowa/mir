@@ -11,6 +11,7 @@ nothing HTML-, header- or cookie-injectable.
     <MixedOperand errorLevel="suppress"/>
     <PossiblyFalseOperand errorLevel="suppress"/>
     <PossiblyFalseArgument errorLevel="suppress"/>
+    <ResourceExhaustion errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===

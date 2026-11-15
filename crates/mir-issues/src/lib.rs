@@ -793,6 +793,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/tainted_log/`.
     TaintedLog,
 
+    /// A size, count or duration from the request reaches a builtin whose cost grows with it.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/resource_exhaustion/`.
+    ResourceExhaustion { function: String },
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1257,6 +1262,7 @@ impl IssueKind {
             | IssueKind::QuotedShellEscape
             | IssueKind::UnrestrictedFileUpload
             | IssueKind::HostHeaderInjection
+            | IssueKind::ResourceExhaustion { .. }
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1542,6 +1548,7 @@ impl IssueKind {
             IssueKind::TaintedNoSql => "MIR0828",
             IssueKind::TaintedCsv => "MIR0829",
             IssueKind::TaintedLog => "MIR0830",
+            IssueKind::ResourceExhaustion { .. } => "MIR0831",
             IssueKind::TaintedInput { .. } => "MIR0800",
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
@@ -1672,7 +1679,9 @@ impl IssueKind {
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
             | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" | "MIR0820"
-            | "MIR0821" | "MIR0822" | "MIR0825" | "MIR0826" | "MIR0827" => Some(Severity::Warning),
+            | "MIR0821" | "MIR0822" | "MIR0825" | "MIR0826" | "MIR0827" | "MIR0831" => {
+                Some(Severity::Warning)
+            }
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1869,6 +1878,7 @@ impl IssueKind {
             IssueKind::TaintedNoSql => "TaintedNoSql",
             IssueKind::TaintedCsv => "TaintedCsv",
             IssueKind::TaintedLog => "TaintedLog",
+            IssueKind::ResourceExhaustion { .. } => "ResourceExhaustion",
             IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
@@ -2635,6 +2645,7 @@ impl IssueKind {
             IssueKind::TaintedNoSql => "Tainted NoSQL query — possible NoSQL injection".to_string(),
             IssueKind::TaintedCsv => "Tainted CSV field — possible spreadsheet formula injection".to_string(),
             IssueKind::TaintedLog => "Tainted log message — possible log injection".to_string(),
+            IssueKind::ResourceExhaustion { function } => format!("{function}() takes its size, count or duration straight from the request — possible denial of service"),
             IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
@@ -3491,6 +3502,7 @@ mod code_tests {
                 method: s(),
             },
             IssueKind::MissingSensitiveParameter { param: s() },
+            IssueKind::ResourceExhaustion { function: s() },
             IssueKind::TaintedLog,
             IssueKind::TaintedCsv,
             IssueKind::TaintedNoSql,
@@ -3699,6 +3711,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 211);
+        assert_eq!(one_of_each().len(), 212);
     }
 }

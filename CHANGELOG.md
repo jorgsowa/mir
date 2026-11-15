@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TaintedFile` also covers the path of `new CURLFile()` and `curl_file_create()`, which makes the server upload any local file it can read.
 - `TaintedCsv` (MIR0829, error): tainted fields of the row `fputcsv()` or `SplFileObject::fputcsv()` writes, which a spreadsheet runs as a formula when they start with `=`, `+`, `-` or `@`. A field that starts with other literal text isn't reported.
 - `TaintedLog` (MIR0830, error, opt-in): a tainted `error_log()` message or PSR-3 `LoggerInterface` message, where a line break forges log entries, and `@taint-sink log` parameters. Values passed in the PSR-3 context array aren't reported.
+- `ResourceExhaustion` (MIR0831, warning): a request value, even cast with `(int)` or `intval()`, as the count of `str_repeat()`, `str_pad()`, `range()`, `array_fill()` or `array_pad()`, or the duration of `sleep()`, `usleep()`, `time_nanosleep()` or `set_time_limit()`. A value compared with a bound first or clamped with `min()` isn't reported.
 
 ### Changed
 

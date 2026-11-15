@@ -67,6 +67,17 @@ pub(crate) fn check_builtin_call(
             check_quoted_shell_escape(ea, command, ctx, span);
         }
     }
+    if let Some(amount) = resource_amount_arg(fn_name_lower, args) {
+        if is_request_input(amount, ctx) {
+            ea.emit(
+                mir_issues::IssueKind::ResourceExhaustion {
+                    function: fn_name_lower.to_string(),
+                },
+                mir_issues::Severity::Warning,
+                span,
+            );
+        }
+    }
     if matches!(fn_name_lower, "mail" | "mb_send_mail")
         && arg(args, 2, "message").is_some_and(|body| is_host_derived(body, ctx))
     {
@@ -748,5 +759,24 @@ pub(crate) fn forget_checked_origins(cond: &Expr, ctx: &mut FlowState) {
             ctx.forget_value_origin(var, ValueOrigin::HostHeader);
             ctx.forget_value_origin(var, ValueOrigin::RequestInput);
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Resource exhaustion
+// ---------------------------------------------------------------------------
+
+/// The size, count or duration argument of a builtin whose cost grows with it.
+fn resource_amount_arg<'e>(fn_name_lower: &str, args: &'e [Arg]) -> Option<&'e Expr> {
+    match fn_name_lower {
+        "str_repeat" => arg(args, 1, "times"),
+        "str_pad" => arg(args, 1, "length"),
+        "range" => arg(args, 1, "end"),
+        "array_fill" => arg(args, 1, "count"),
+        "array_pad" => arg(args, 1, "length"),
+        "sleep" | "set_time_limit" => arg(args, 0, "seconds"),
+        "usleep" => arg(args, 0, "microseconds"),
+        "time_nanosleep" => arg(args, 0, "seconds"),
+        _ => None,
     }
 }
