@@ -792,6 +792,17 @@ pub(crate) fn check_condition(
     ctx: &FlowState,
 ) {
     for part in condition_parts(cond) {
+        if let Some(function) = error_value_passes(part) {
+            ea.emit(
+                mir_issues::IssueKind::InsecureCheckResult {
+                    reason: format!(
+                        "{function}() returns -1 on error, which passes this check; compare with === 1"
+                    ),
+                },
+                mir_issues::Severity::Warning,
+                part.span,
+            );
+        }
         if let Some(ip) = spoofable_ip_check(part, ctx) {
             ea.emit(
                 mir_issues::IssueKind::SpoofableClientIp,
@@ -799,6 +810,45 @@ pub(crate) fn check_condition(
                 ip.span,
             );
         }
+    }
+}
+
+/// The verifying function whose `-1` error result a condition lets through, as it treats any
+/// truthy result as success: `if (openssl_verify(...))`, `openssl_verify(...) != 0`.
+fn error_value_passes(check: &Expr) -> Option<&str> {
+    if let Some(name) = verifier(check) {
+        return Some(name);
+    }
+    let ExprKind::Binary(b) = &check.kind else {
+        return None;
+    };
+    let (call, literal) = match (verifier(&b.left), verifier(&b.right)) {
+        (Some(name), _) => (name, &b.right.kind),
+        (_, Some(name)) => (name, &b.left.kind),
+        _ => return None,
+    };
+    use php_ast::ast::BinaryOp;
+    let passes = matches!(
+        (b.op, literal),
+        (BinaryOp::Equal, ExprKind::Bool(true))
+            | (
+                BinaryOp::NotEqual | BinaryOp::NotIdentical,
+                ExprKind::Bool(false) | ExprKind::Int(0)
+            )
+    );
+    passes.then_some(call)
+}
+
+fn verifier(e: &Expr) -> Option<&str> {
+    const VERIFIERS: &[&str] = &[
+        "openssl_verify",
+        "openssl_x509_verify",
+        "openssl_pkcs7_verify",
+        "ldap_compare",
+    ];
+    match &e.kind {
+        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, VERIFIERS) => fc.name.kind.name_bare(),
+        _ => None,
     }
 }
 

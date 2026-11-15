@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ResourceExhaustion` (MIR0831, warning): a request value, even cast with `(int)` or `intval()`, as the count of `str_repeat()`, `str_pad()`, `range()`, `array_fill()` or `array_pad()`, or the duration of `sleep()`, `usleep()`, `time_nanosleep()` or `set_time_limit()`. A value compared with a bound first or clamped with `min()` isn't reported.
 - `SpoofableClientIp` (MIR0832, warning): an `if`, `elseif` or ternary condition that compares `$_SERVER['HTTP_X_FORWARDED_FOR']`, `HTTP_CLIENT_IP` or `HTTP_X_REAL_IP`, directly or through a variable, or looks it up with `in_array()`, `str_starts_with()`, `preg_match()` and similar. Clients set these headers, so IP allowlists built on them are bypassed. Presence checks aren't reported.
 - `CodeAfterRedirect` (MIR0833, warning): a `header('Location: ...')` call followed by `echo`, `print` or inline HTML on a path with no `exit`, `return`, `throw` or never-returning call in between, so the protected page is still sent in the body.
+- `InsecureCheckResult` (MIR0834, warning): `openssl_verify()`, `openssl_x509_verify()`, `openssl_pkcs7_verify()` or `ldap_compare()` used as a condition, or compared with `== true`, `!= 0` or `!== false`, which accepts their `-1` error result.
 
 ### Changed
 
