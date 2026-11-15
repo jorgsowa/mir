@@ -3,6 +3,7 @@ use php_ast::owned::{Arg, Expr, ExprKind};
 
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
+use crate::flow_state::{FlowState, ValueOrigin};
 
 /// The argument at `index`, or the one named `name`.
 fn arg<'e>(args: &'e [Arg], index: usize, name: &str) -> Option<&'e Expr> {
@@ -38,8 +39,19 @@ pub(crate) fn check_builtin_call(
     ea: &mut crate::expr::ExpressionAnalyzer<'_>,
     fn_name_lower: &str,
     args: &[Arg],
+    ctx: &FlowState,
     span: php_ast::Span,
 ) {
+    if fn_name_lower == "session_id" && arg(args, 0, "id").is_some_and(|id| is_weak_random(id, ctx))
+    {
+        ea.emit(
+            mir_issues::IssueKind::InsecureRandomness {
+                context: "the session ID".to_string(),
+            },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(reason) = password_hash_misuse(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::InsecurePasswordHash { reason },
@@ -209,6 +221,166 @@ fn reads_request_parameter(expr: &Expr) -> bool {
         }
         ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => reads_request_parameter(inner),
         ExprKind::NullCoalesce(nc) => reads_request_parameter(&nc.left),
+        _ => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Randomness
+// ---------------------------------------------------------------------------
+
+/// Report a guessable random value returned from a function named for a secret.
+pub(crate) fn check_weak_random_return(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    value: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let name = match (&ctx.current_method_name, &ctx.current_function_fqn) {
+        (Some(method), _) => method.as_ref(),
+        (None, Some(function)) => function.rsplit('\\').next().unwrap_or(function),
+        (None, None) => return,
+    };
+    if is_weak_random(value, ctx) && names_secret(name) {
+        ea.emit(
+            mir_issues::IssueKind::InsecureRandomness {
+                context: format!("the value {name}() returns"),
+            },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+/// Whether a function name ends in a word for a secret: `generateToken`, `make_salt`, `newApiKey`.
+fn names_secret(name: &str) -> bool {
+    let mut words: Vec<String> = Vec::new();
+    for (i, c) in name.char_indices() {
+        if c == '_' {
+            words.push(String::new());
+        } else if words.is_empty() || (c.is_ascii_uppercase() && i > 0) {
+            words.push(c.to_ascii_lowercase().to_string());
+        } else if let Some(word) = words.last_mut() {
+            word.push(c.to_ascii_lowercase());
+        }
+    }
+    words.retain(|w| !w.is_empty());
+    let last = words.last().map(String::as_str);
+    let last_two =
+        (words.len() >= 2).then(|| format!("{}{}", words[words.len() - 2], words[words.len() - 1]));
+    matches!(
+        last,
+        Some("token" | "secret" | "password" | "passwd" | "nonce" | "salt" | "otp")
+    ) || matches!(
+        last_two.as_deref(),
+        Some("apikey" | "resetcode" | "verificationcode" | "confirmationcode")
+    )
+}
+
+/// A value from a non-cryptographic generator, possibly hashed, encoded or concatenated,
+/// with no cryptographically secure part mixed in.
+pub(crate) fn is_weak_random(expr: &Expr, ctx: &FlowState) -> bool {
+    has_weak_random(expr, ctx) && !has_secure_random(expr)
+}
+
+fn has_weak_random(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(name) => ctx.has_value_origin(name, ValueOrigin::WeakRandom),
+        ExprKind::FunctionCall(fc) => match random_call(&fc.name) {
+            Some(Generator::Weak) => true,
+            Some(Generator::Secure) => false,
+            None => {
+                named_one_of(&fc.name, DERIVED_FROM_ARGS)
+                    && fc
+                        .args
+                        .iter()
+                        .filter_map(|a| a.value())
+                        .any(|v| has_weak_random(v, ctx))
+            }
+        },
+        ExprKind::ArrayAccess(aa) => aa.index.as_ref().is_some_and(|i| has_weak_random(i, ctx)),
+        _ => any_string_part(expr, &mut |part| has_weak_random(part, ctx)),
+    }
+}
+
+fn has_secure_random(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::FunctionCall(fc) => {
+            random_call(&fc.name) == Some(Generator::Secure)
+                || fc
+                    .args
+                    .iter()
+                    .filter_map(|a| a.value())
+                    .any(has_secure_random)
+        }
+        ExprKind::ArrayAccess(aa) => aa.index.as_ref().is_some_and(has_secure_random),
+        _ => any_string_part(expr, &mut has_secure_random),
+    }
+}
+
+#[derive(PartialEq)]
+enum Generator {
+    Weak,
+    Secure,
+}
+
+const WEAK_GENERATORS: &[&str] = &[
+    "rand",
+    "mt_rand",
+    "uniqid",
+    "lcg_value",
+    "str_shuffle",
+    "array_rand",
+];
+const SECURE_GENERATORS: &[&str] = &["random_bytes", "random_int", "openssl_random_pseudo_bytes"];
+/// Builtins whose result is a function of their arguments' content.
+const DERIVED_FROM_ARGS: &[&str] = &[
+    "md5",
+    "sha1",
+    "hash",
+    "crc32",
+    "base64_encode",
+    "bin2hex",
+    "dechex",
+    "base_convert",
+    "substr",
+    "str_pad",
+    "strtoupper",
+    "strtolower",
+    "sprintf",
+    "strval",
+    "implode",
+    "str_replace",
+];
+
+fn named_one_of(name: &Expr, names: &[&str]) -> bool {
+    name.kind.name_bare().is_some_and(|n| {
+        names
+            .iter()
+            .any(|candidate| n.eq_ignore_ascii_case(candidate))
+    })
+}
+
+fn random_call(name: &Expr) -> Option<Generator> {
+    if named_one_of(name, WEAK_GENERATORS) {
+        Some(Generator::Weak)
+    } else if named_one_of(name, SECURE_GENERATORS) {
+        Some(Generator::Secure)
+    } else {
+        None
+    }
+}
+
+/// Whether `f` holds for a sub-expression a string-building expression copies into its result.
+fn any_string_part(expr: &Expr, f: &mut dyn FnMut(&Expr) -> bool) -> bool {
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => f(inner),
+        ExprKind::Binary(b) if b.op == php_ast::ast::BinaryOp::Concat => f(&b.left) || f(&b.right),
+        ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) => {
+            crate::ast_ext::StringPartsExt::string_parts(&expr.kind)
+                .iter()
+                .any(|part| matches!(part, php_ast::owned::StringPart::Expr(e) if f(e)))
+        }
         _ => false,
     }
 }

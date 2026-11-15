@@ -96,6 +96,8 @@ pub enum ValueOrigin {
     FileHandle,
     /// A `realpath()` result: canonical, with no `..` or symlink left.
     CanonicalPath,
+    /// A value from a non-cryptographic random generator.
+    WeakRandom,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

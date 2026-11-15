@@ -650,6 +650,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             crate::taint::assigned_value_origin(&a.value).filter(|_| !a.by_ref)
                         {
                             ctx.mark_value_origin(name.as_ref(), origin);
+                        } else if !a.by_ref && crate::security::is_weak_random(&a.value, ctx) {
+                            ctx.mark_value_origin(
+                                name.as_ref(),
+                                crate::flow_state::ValueOrigin::WeakRandom,
+                            );
                         }
                         if a.by_ref {
                             ctx.alias_var(name.as_ref());

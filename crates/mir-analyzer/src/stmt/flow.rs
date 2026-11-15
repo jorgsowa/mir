@@ -313,6 +313,12 @@ impl<'a> StatementsAnalyzer<'a> {
         let stmt_span = stmt.span;
         if let Some(expr) = opt_expr {
             let ret_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+            crate::security::check_weak_random_return(
+                &mut self.expr_analyzer(ctx),
+                expr,
+                ctx,
+                stmt_span,
+            );
             self.taint_summary.record_overwritten_props(ctx);
             self.taint_summary.record_out_params(ctx);
             if crate::taint::is_injection_safe_type(&ret_ty) {

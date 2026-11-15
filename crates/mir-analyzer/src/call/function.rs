@@ -593,7 +593,7 @@ impl CallAnalyzer {
             }
         }
 
-        crate::security::check_builtin_call(ea, &fn_name_lower, &call.args, span);
+        crate::security::check_builtin_call(ea, &fn_name_lower, &call.args, ctx, span);
 
         if fn_name_lower == "header" {
             if let Some(non_html) = crate::taint::header_sets_non_html(&call.args) {

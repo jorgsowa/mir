@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InsecurePasswordHash` (MIR0815, warning): a `salt` option to `password_hash()` (ignored since PHP 8.0), a bcrypt `cost` below 10, and `password_hash()` of a raw binary digest, which bcrypt truncates at the first NUL byte.
 - `WeakCryptography` (MIR0816, warning): `openssl_encrypt()`/`openssl_decrypt()` with a literal cipher in ECB mode or from the DES, RC2, RC4 or Blowfish families, a key or non-empty IV written as a string literal, or `openssl_decrypt()` of a GCM, CCM, OCB or ChaCha20-Poly1305 cipher without the `tag` argument.
 - `InsecureSessionConfig` (MIR0817, warning): `ini_set()` or `session_start()` options that turn off `session.use_strict_mode`, `session.use_only_cookies` or `session.cookie_httponly`, or turn on `session.use_trans_sid`, and `session_id()` of a `$_GET`, `$_POST` or `$_REQUEST` value (session fixation).
+- `InsecureRandomness` (MIR0818, warning): a value from `rand()`, `mt_rand()`, `uniqid()`, `lcg_value()`, `str_shuffle()` or `array_rand()`, even hashed, encoded, concatenated or stored in a variable first, passed to `session_id()` or returned from a function or method whose name ends in `token`, `secret`, `password`, `nonce`, `salt`, `otp`, `apiKey` or a reset, verification or confirmation `code`. A value that also mixes in `random_bytes()` or `random_int()` isn't reported.
 
 ### Changed
 
