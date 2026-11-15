@@ -719,6 +719,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
                     }
                 }
+                crate::security::check_quoted_shell_escape(self, expr, ctx, expr.span);
                 if crate::taint::reaches_sink(
                     expr,
                     crate::taint::Taint::SHELL,

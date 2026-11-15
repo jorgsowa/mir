@@ -59,6 +59,14 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if matches!(
+        fn_name_lower,
+        "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open"
+    ) {
+        if let Some(command) = arg(args, 0, "command") {
+            check_quoted_shell_escape(ea, command, ctx, span);
+        }
+    }
     if let Some(reason) = password_hash_misuse(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::InsecurePasswordHash { reason },
@@ -487,5 +495,73 @@ fn copies_this_property(expr: &Expr) -> bool {
         ExprKind::ArrayAccess(aa) => copies_this_property(&aa.array),
         ExprKind::Array(elements) => elements.iter().any(|el| copies_this_property(el.value())),
         _ => any_string_part(expr, &mut copies_this_property),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shell quoting
+// ---------------------------------------------------------------------------
+
+/// Report an `escapeshellarg()` result placed between quotes in a shell command:
+/// `"ls '" . escapeshellarg($dir) . "'"`. Its own quotes then close the outer ones.
+pub(crate) fn check_quoted_shell_escape(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    command: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let mut parts = Vec::new();
+    command_parts(command, &mut parts);
+    let quoted = parts.windows(3).any(|w| match w {
+        [CommandPart::Text(before), CommandPart::Value(value), CommandPart::Text(after)] => {
+            let open = before.chars().last();
+            matches!(open, Some('\'' | '"'))
+                && after.chars().next() == open
+                && is_shell_escaped(value, ctx)
+        }
+        _ => false,
+    });
+    if quoted {
+        ea.emit(
+            mir_issues::IssueKind::QuotedShellEscape,
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+enum CommandPart<'e> {
+    Text(&'e str),
+    Value(&'e Expr),
+}
+
+fn command_parts<'e>(expr: &'e Expr, out: &mut Vec<CommandPart<'e>>) {
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) => command_parts(inner, out),
+        ExprKind::Binary(b) if b.op == php_ast::ast::BinaryOp::Concat => {
+            command_parts(&b.left, out);
+            command_parts(&b.right, out);
+        }
+        ExprKind::String(s) => out.push(CommandPart::Text(s.as_str())),
+        ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) | ExprKind::ShellExec(_) => {
+            for part in crate::ast_ext::StringPartsExt::string_parts(&expr.kind) {
+                match part {
+                    php_ast::owned::StringPart::Literal(s) => {
+                        out.push(CommandPart::Text(s.as_str()))
+                    }
+                    php_ast::owned::StringPart::Expr(e) => out.push(CommandPart::Value(e)),
+                    _ => out.push(CommandPart::Text("")),
+                }
+            }
+        }
+        _ => out.push(CommandPart::Value(expr)),
+    }
+}
+
+fn is_shell_escaped(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(name) => ctx.has_value_origin(name, ValueOrigin::ShellEscaped),
+        ExprKind::FunctionCall(fc) => named_one_of(&fc.name, &["escapeshellarg"]),
+        _ => false,
     }
 }

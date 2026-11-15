@@ -102,6 +102,8 @@ pub enum ValueOrigin {
     RequestInput,
     /// A string checked not to start with `-`, so it can't pass a command-line option.
     NoLeadingDash,
+    /// An `escapeshellarg()` result, already wrapped in its own single quotes.
+    ShellEscaped,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

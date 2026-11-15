@@ -181,6 +181,7 @@ issues keep their code.
 | MIR0822  | MissingSensitiveParameter     | [security/missing-sensitive-parameter](../security/missing-sensitive-parameter/) |
 | MIR0823  | TaintedMassAssignment         | [security/tainted-mass-assignment](../security/tainted-mass-assignment/) |
 | MIR0824  | TaintedCommandArgument        | [security/tainted-command-argument](../security/tainted-command-argument/) |
+| MIR0825  | QuotedShellEscape             | [security/quoted-shell-escape](../security/quoted-shell-escape/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

@@ -675,6 +675,9 @@ pub fn assigned_value_origin(value: &Expr) -> Option<ValueOrigin> {
     if name.eq_ignore_ascii_case("realpath") {
         return Some(ValueOrigin::CanonicalPath);
     }
+    if name.eq_ignore_ascii_case("escapeshellarg") {
+        return Some(ValueOrigin::ShellEscaped);
+    }
     let path = fc
         .args
         .first()
