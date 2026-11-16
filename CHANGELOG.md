@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A class whose traits declare the same property incompatibly no longer also reports MissingConstructor.
 - Report a resource closed by `fclose()`/`pclose()`/`closedir()` passed to an `open-resource` parameter as InvalidArgument.
 - Report `0.0` passed to a `non-empty-scalar` parameter as InvalidArgument.
 - Report calls to methods of an `@internal` class from outside the class's root namespace as InternalMethod.

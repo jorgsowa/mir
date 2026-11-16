@@ -320,6 +320,12 @@ impl<'a> ClassAnalyzer<'a> {
         location: Option<&Location>,
         issues: &mut Vec<Issue>,
     ) {
+        // The class fails to compose, so it never gets constructed.
+        if issues.iter().any(|i| {
+            matches!(&i.kind, IssueKind::CompileError { code, .. } if code == "trait-property-conflict")
+        }) {
+            return;
+        }
         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
         let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
         // Index (in `ancestors`, self-first) of the class whose constructor

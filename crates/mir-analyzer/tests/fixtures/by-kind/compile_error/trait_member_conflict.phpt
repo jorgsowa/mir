@@ -34,7 +34,6 @@ class FromParent extends Base {
 }
 
 class Differs {
-//<^^^^^^^^^^^^^^^ MissingConstructor: Class Differs has uninitialized properties but no constructor
     use Counter;
 //      ^^^^^^^^ CompileError: Differs and Counter define the same property ($count) in the composition of Differs. However, the definition differs and is considered incompatible. Class was composed [trait-property-conflict]
 //      ^^^^^^^^ CompileError: Differs and Counter define the same property ($label) in the composition of Differs. However, the definition differs and is considered incompatible. Class was composed [trait-property-conflict]
@@ -60,7 +59,6 @@ trait Other {
 }
 
 class TwoTraits {
-//<^^^^^^^^^^^^^^^^^ MissingConstructor: Class TwoTraits has uninitialized properties but no constructor
     use Counter, Other;
 //               ^^^^^^ CompileError: Counter and Other define the same property ($label) in the composition of TwoTraits. However, the definition differs and is considered incompatible. Class was composed [trait-property-conflict]
 }
