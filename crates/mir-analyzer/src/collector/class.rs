@@ -136,6 +136,7 @@ impl<'a> DefinitionCollector<'a> {
         let _int_mask_guard =
             crate::parser::docblock::SelfIntConstantsGuard::activate(&fqcn, &self_int_constants);
 
+        let mut statement_uses: Vec<mir_types::Type> = Vec::new();
         for member in decl.body.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
@@ -478,6 +479,9 @@ impl<'a> DefinitionCollector<'a> {
                     own_constants.insert(Arc::from(const_name), constant);
                 }
                 ClassMemberKind::TraitUse(tu) => {
+                    if let Some(doc) = &tu.doc_comment {
+                        statement_uses.extend(self.parse_docblock_from_node(Some(doc)).uses);
+                    }
                     for t in tu.traits.iter() {
                         let fqcn: Arc<str> = self.resolve_ast_name(t).into();
                         let loc = self.location(t.span.start, t.span.end);
@@ -631,6 +635,7 @@ impl<'a> DefinitionCollector<'a> {
         let trait_use_type_args: Vec<(Arc<str>, Vec<mir_types::Type>)> = class_doc
             .uses
             .iter()
+            .chain(&statement_uses)
             .filter_map(|ty| {
                 if let Some(Atomic::TNamedObject {
                     fqcn: used_trait,

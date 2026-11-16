@@ -113,6 +113,7 @@ impl DefinitionCollector<'_> {
 
         let mut declared_properties = Vec::new();
         let mut case_values: FxHashMap<EnumCaseValue, &str> = FxHashMap::default();
+        let mut statement_uses: Vec<mir_types::Type> = Vec::new();
         for member in decl.body.members.iter() {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
@@ -330,6 +331,9 @@ impl DefinitionCollector<'_> {
                     });
                 }
                 EnumMemberKind::TraitUse(tu) => {
+                    if let Some(doc) = &tu.doc_comment {
+                        statement_uses.extend(self.parse_docblock_from_node(Some(doc)).uses);
+                    }
                     for t in tu.traits.iter() {
                         let trait_fqcn: Arc<str> = self.resolve_ast_name(t).into();
                         trait_use_locations
@@ -380,6 +384,7 @@ impl DefinitionCollector<'_> {
         let trait_use_type_args: Vec<(Arc<str>, Vec<mir_types::Type>)> = enum_doc
             .uses
             .iter()
+            .chain(&statement_uses)
             .filter_map(|ty| {
                 if let Some(mir_types::Atomic::TNamedObject {
                     fqcn: used_trait,
