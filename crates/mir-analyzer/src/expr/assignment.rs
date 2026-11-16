@@ -649,45 +649,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if rhs_plain {
                             ctx.mark_plain(name.as_ref());
                         }
-                        if let Some(origin) =
-                            crate::taint::assigned_value_origin(&a.value).filter(|_| !a.by_ref)
-                        {
-                            ctx.mark_value_origin(name.as_ref(), origin);
-                        } else if !a.by_ref && crate::security::is_weak_random(&a.value, ctx) {
-                            ctx.mark_value_origin(
-                                name.as_ref(),
-                                crate::flow_state::ValueOrigin::WeakRandom,
-                            );
-                        } else if !a.by_ref && crate::security::is_decoded(&a.value, ctx) {
-                            ctx.mark_value_origin(
-                                name.as_ref(),
-                                crate::flow_state::ValueOrigin::Decoded,
-                            );
-                        } else if !a.by_ref && crate::security::is_request_origin(&a.value, ctx) {
-                            ctx.mark_value_origin(
-                                name.as_ref(),
-                                crate::flow_state::ValueOrigin::OriginHeader,
-                            );
-                        } else if !a.by_ref && crate::security::is_spoofable_ip(&a.value, ctx) {
-                            ctx.mark_value_origin(
-                                name.as_ref(),
-                                crate::flow_state::ValueOrigin::SpoofableIp,
-                            );
-                        } else if !a.by_ref && crate::security::is_host_derived(&a.value, ctx) {
-                            ctx.mark_value_origin(
-                                name.as_ref(),
-                                crate::flow_state::ValueOrigin::HostHeader,
-                            );
-                        } else if !a.by_ref && crate::security::is_client_file_name(&a.value, ctx) {
-                            ctx.mark_value_origin(
-                                name.as_ref(),
-                                crate::flow_state::ValueOrigin::ClientFileName,
-                            );
-                        } else if !a.by_ref && crate::security::is_request_input(&a.value, ctx) {
-                            ctx.mark_value_origin(
-                                name.as_ref(),
-                                crate::flow_state::ValueOrigin::RequestInput,
-                            );
+                        if !a.by_ref {
+                            let origins = crate::security::assigned_origins(&a.value, ctx);
+                            ctx.mark_value_origins(name.as_ref(), origins);
                         }
                         if a.by_ref {
                             ctx.alias_var(name.as_ref());
@@ -839,17 +803,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                     } else {
                         Type::single(Atomic::TString)
                     };
+                    let origins = ctx
+                        .value_origins(var_name)
+                        .intersection(crate::flow_state::ValueOrigin::CONTENT)
+                        .union(crate::security::assigned_origins(&a.value, ctx));
                     ctx.set_var(var_name, result_ty.clone());
                     // `.=`'s result keeps the OLD value's content (unlike plain
                     // `=`, which fully replaces it) — so it stays tainted if
                     // either side was, not just the RHS.
                     ctx.taint_var(var_name, rhs_taint);
-                    if crate::security::is_client_file_name(&a.value, ctx) {
-                        ctx.mark_value_origin(
-                            var_name,
-                            crate::flow_state::ValueOrigin::ClientFileName,
-                        );
-                    }
+                    ctx.mark_value_origins(var_name, origins);
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
                     ctx.record_var_location(var_name, line, col_start, line_end, col_end);

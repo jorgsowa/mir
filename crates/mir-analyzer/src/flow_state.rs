@@ -114,6 +114,51 @@ pub enum ValueOrigin {
     OriginHeader,
     /// The output of a decoder such as `base64_decode()` or `gzinflate()`.
     Decoded,
+    /// A value a condition proved non-empty and truthy.
+    NonEmpty,
+}
+
+impl ValueOrigin {
+    /// Origins describing part of a value's content, which appending to it keeps.
+    pub const CONTENT: OriginSet = OriginSet::EMPTY
+        .with(ValueOrigin::WeakRandom)
+        .with(ValueOrigin::RequestInput)
+        .with(ValueOrigin::HostHeader)
+        .with(ValueOrigin::SpoofableIp)
+        .with(ValueOrigin::OriginHeader)
+        .with(ValueOrigin::Decoded);
+}
+
+/// The [`ValueOrigin`]s one variable holds at once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OriginSet(u16);
+
+impl OriginSet {
+    pub const EMPTY: OriginSet = OriginSet(0);
+
+    pub const fn with(self, origin: ValueOrigin) -> Self {
+        OriginSet(self.0 | (1 << origin as u16))
+    }
+
+    pub const fn without(self, origin: ValueOrigin) -> Self {
+        OriginSet(self.0 & !(1 << origin as u16))
+    }
+
+    pub const fn contains(self, origin: ValueOrigin) -> bool {
+        self.0 & (1 << origin as u16) != 0
+    }
+
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    pub const fn union(self, other: OriginSet) -> Self {
+        OriginSet(self.0 | other.0)
+    }
+
+    pub const fn intersection(self, other: OriginSet) -> Self {
+        OriginSet(self.0 & other.0)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -397,7 +442,7 @@ pub struct FlowState {
     pub plain_vars: Arc<FxHashSet<Name>>,
 
     /// Variables whose last assigned value has a known origin.
-    pub value_origins: Arc<FxHashMap<Name, ValueOrigin>>,
+    pub value_origins: Arc<FxHashMap<Name, OriginSet>>,
 
     /// Label slots standing for parameters the body proves objects, shared by
     /// every branch of the body; see `taint::seed_object_guards`.
@@ -1887,23 +1932,50 @@ impl FlowState {
     }
 
     pub fn mark_value_origin(&mut self, name: &str, origin: ValueOrigin) {
-        Arc::make_mut(&mut self.value_origins)
-            .insert(Name::from(name.trim_start_matches('$')), origin);
+        self.mark_value_origins(name, OriginSet::EMPTY.with(origin));
+    }
+
+    /// Add `origins` to those `name` already holds.
+    pub fn mark_value_origins(&mut self, name: &str, origins: OriginSet) {
+        if origins.is_empty() {
+            return;
+        }
+        let entry = Arc::make_mut(&mut self.value_origins)
+            .entry(Name::from(name.trim_start_matches('$')))
+            .or_default();
+        *entry = entry.union(origins);
     }
 
     pub fn forget_value_origin(&mut self, name: &str, origin: ValueOrigin) {
-        if self.has_value_origin(name, origin) {
-            Arc::make_mut(&mut self.value_origins)
-                .remove(&Name::from(name.trim_start_matches('$')));
+        if !self.has_value_origin(name, origin) {
+            return;
+        }
+        let sym = Name::from(name.trim_start_matches('$'));
+        let origins = Arc::make_mut(&mut self.value_origins);
+        let rest = origins
+            .get(&sym)
+            .copied()
+            .unwrap_or_default()
+            .without(origin);
+        if rest.is_empty() {
+            origins.remove(&sym);
+        } else {
+            origins.insert(sym, rest);
         }
     }
 
     pub fn has_value_origin(&self, name: &str, origin: ValueOrigin) -> bool {
-        !self.value_origins.is_empty()
-            && self
-                .value_origins
-                .get(&Name::from(name.trim_start_matches('$')))
-                == Some(&origin)
+        self.value_origins(name).contains(origin)
+    }
+
+    pub fn value_origins(&self, name: &str) -> OriginSet {
+        if self.value_origins.is_empty() {
+            return OriginSet::EMPTY;
+        }
+        self.value_origins
+            .get(&Name::from(name.trim_start_matches('$')))
+            .copied()
+            .unwrap_or_default()
     }
 
     fn unbind_closure(&mut self, sym: Name) {
@@ -3061,8 +3133,10 @@ impl FlowState {
                 if_ctx
                     .value_origins
                     .iter()
-                    .filter(|(name, origin)| else_ctx.value_origins.get(name) == Some(origin))
-                    .map(|(name, origin)| (*name, *origin))
+                    .filter_map(|(name, origins)| {
+                        let both = origins.intersection(*else_ctx.value_origins.get(name)?);
+                        (!both.is_empty()).then_some((*name, both))
+                    })
                     .collect(),
             );
         }

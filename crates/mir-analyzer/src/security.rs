@@ -4,7 +4,7 @@ use php_ast::owned::{Arg, Expr, ExprKind};
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
-use crate::flow_state::{FlowState, ValueOrigin};
+use crate::flow_state::{FlowState, OriginSet, ValueOrigin};
 
 /// The argument at `index`, or the one named `name`.
 fn arg<'e>(args: &'e [Arg], index: usize, name: &str) -> Option<&'e Expr> {
@@ -301,6 +301,31 @@ fn weakened_session_setting(name: &str, value: &Expr) -> Option<String> {
         }
         _ => None,
     }
+}
+
+type OriginCheck = fn(&Expr, &FlowState) -> bool;
+
+/// Every origin a variable assigned `value` takes on.
+pub(crate) fn assigned_origins(value: &Expr, ctx: &FlowState) -> OriginSet {
+    let mut origins = OriginSet::EMPTY;
+    if let Some(origin) = crate::taint::assigned_value_origin(value) {
+        origins = origins.with(origin);
+    }
+    let checks: [(OriginCheck, ValueOrigin); 7] = [
+        (is_weak_random, ValueOrigin::WeakRandom),
+        (is_decoded, ValueOrigin::Decoded),
+        (is_request_origin, ValueOrigin::OriginHeader),
+        (is_spoofable_ip, ValueOrigin::SpoofableIp),
+        (is_host_derived, ValueOrigin::HostHeader),
+        (is_client_file_name, ValueOrigin::ClientFileName),
+        (is_request_input, ValueOrigin::RequestInput),
+    ];
+    for (holds, origin) in checks {
+        if holds(value, ctx) {
+            origins = origins.with(origin);
+        }
+    }
+    origins
 }
 
 /// A request superglobal or a value read from one, possibly cast, trimmed or with a `??`
