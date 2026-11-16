@@ -528,6 +528,9 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     fn analyze_stmt_inner(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut FlowState) {
+        if ctx.redirect_fallthrough.is_some() && runs_code(stmt) {
+            self.report_code_after_redirect(ctx);
+        }
         let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
         let suppressions = self.extract_suppressions_from(doc);
         let before = self.issues.issue_count();
@@ -755,7 +758,6 @@ impl<'a> StatementsAnalyzer<'a> {
 
             // ---- Echo ---------------------------------------------------------
             StmtKind::Echo(exprs) => {
-                self.report_output_after_redirect(ctx);
                 self.analyze_echo_stmt(exprs, stmt.span, ctx);
             }
 
@@ -864,10 +866,6 @@ impl<'a> StatementsAnalyzer<'a> {
                 for item in items.iter() {
                     self.record_global_const_decl_name(item);
                 }
-            }
-
-            StmtKind::InlineHtml(html) if !html.trim().is_empty() => {
-                self.report_output_after_redirect(ctx);
             }
 
             // ---- Inert --------------------------------------------------------
@@ -1680,3 +1678,12 @@ pub(crate) fn widen_for_check(u: Type) -> Type {
 /// Whether a loop body's second pass, entered with the second state, would
 /// repeat its first, entered with the first.
 type RepeatsFirstPass<'a> = &'a dyn Fn(&FlowState, &FlowState) -> bool;
+
+/// Whether `stmt` does anything when it runs: not a stray `;`, `?>` or whitespace between tags.
+fn runs_code(stmt: &php_ast::owned::Stmt) -> bool {
+    match &stmt.kind {
+        StmtKind::Nop => false,
+        StmtKind::InlineHtml(html) => !html.trim().is_empty(),
+        _ => true,
+    }
+}

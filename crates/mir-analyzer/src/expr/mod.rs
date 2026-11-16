@@ -814,13 +814,6 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- print ------------------------------------------------------
             ExprKind::Print(inner) => {
-                if let Some(redirect) = ctx.redirect_pending.take() {
-                    self.emit(
-                        IssueKind::CodeAfterRedirect,
-                        mir_issues::Severity::Warning,
-                        redirect,
-                    );
-                }
                 let expr_ty = self.analyze(inner, ctx);
                 self.check_interpolation_implicit_to_string_cast(&expr_ty, inner.span);
                 // `print` is an HTML sink exactly like `echo` — both write

@@ -1,6 +1,7 @@
 ===description===
 A redirect followed by `exit`, `return`, `throw` or a function that never returns,
-a redirect with no output after it, and other headers aren't reported.
+a redirect with nothing after it, a redirect outside any condition followed by its
+own page, redirects in every branch, and other headers aren't reported.
 ===file===
 <?php
 /** @return never */
@@ -55,4 +56,26 @@ function closureLater(): Closure {
     return function (): void {
         echo 'later';
     };
+}
+
+function movedPage(string $url): void {
+    header("Location: $url");
+    echo '<a href="' . htmlspecialchars($url) . '">Moved</a>';
+}
+
+function redirectInEveryBranch(bool $ok): void {
+    if ($ok) {
+        header('Location: /home');
+    } else {
+        header('Location: /login');
+    }
+    echo 'Redirecting';
+}
+
+function redirectOrPage(bool $ok): void {
+    if (!$ok) {
+        header('Location: /login');
+    } else {
+        echo 'Welcome';
+    }
 }

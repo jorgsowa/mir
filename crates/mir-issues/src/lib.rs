@@ -2714,7 +2714,7 @@ impl IssueKind {
             IssueKind::TaintedLog => "Tainted log message — possible log injection".to_string(),
             IssueKind::ResourceExhaustion { function } => format!("{function}() takes its size, count or duration straight from the request — possible denial of service"),
             IssueKind::SpoofableClientIp => "Client IP from a header the client can forge decides a check — possible IP allowlist bypass".to_string(),
-            IssueKind::CodeAfterRedirect => "Location redirect isn't followed by exit — the rest of the page is still sent".to_string(),
+            IssueKind::CodeAfterRedirect => "Location redirect isn't followed by exit — the code after it still runs".to_string(),
             IssueKind::InsecureCheckResult { reason } => format!("Insecure check: {reason}"),
             IssueKind::LdapAnonymousBind => "ldap_bind() with a request password that may be empty — an empty password is an anonymous bind, which succeeds".to_string(),
             IssueKind::InsecureFilePermissions { reason } => format!("Insecure file permissions: {reason}"),

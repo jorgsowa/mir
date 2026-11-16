@@ -1,13 +1,13 @@
 ---
 title: CodeAfterRedirect
 code: MIR0833
-description: "A `header('Location: ...')` redirect is followed by output on a path with no `exit`."
+description: "A `header('Location: ...')` redirect in one branch is followed by code that runs after the branch, with no `exit`."
 sidebar:
   hidden: true
   order: 833
 ---
 
-`header('Location: ...')` only adds a header: the script keeps running and sends the rest of the page in the response body. When the redirect guards a protected page (`if (!$loggedIn) { header('Location: /login'); }`), a client that ignores the redirect still reads the page. Reported at the `header()` call when `echo`, `print` or inline HTML runs after it on some path with no `exit`, `die`, `return`, `throw` or call to a function that never returns in between.
+`header('Location: ...')` only adds a header: the script keeps running. When the redirect guards a protected page (`if (!$loggedIn) { header('Location: /login'); }`), the code after the guard still runs for the rejected request: a client that ignores the redirect reads the page, and any action the page performs still happens. Reported at the `header()` call when a branch sends the redirect, the other branch doesn't, and code after the condition runs with no `exit`, `die`, `return`, `throw` or call to a function that never returns in between. A redirect outside any condition followed by its own page body isn't reported: every request gets that page.
 
 ## Example
 

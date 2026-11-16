@@ -38,9 +38,11 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    /// Report a `Location` redirect whose page goes on to send output: no `exit` stopped it.
-    pub(super) fn report_output_after_redirect(&mut self, ctx: &mut FlowState) {
-        if let Some(redirect) = ctx.redirect_pending.take() {
+    /// Report a redirect one branch sent without `exit`, now that the code after the branch
+    /// runs for that request too.
+    pub(super) fn report_code_after_redirect(&mut self, ctx: &mut FlowState) {
+        ctx.redirect_pending = None;
+        if let Some(redirect) = ctx.redirect_fallthrough.take() {
             self.expr_analyzer(ctx).emit(
                 IssueKind::CodeAfterRedirect,
                 mir_issues::Severity::Warning,

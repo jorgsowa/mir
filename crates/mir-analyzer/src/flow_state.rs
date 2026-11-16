@@ -428,6 +428,10 @@ pub struct FlowState {
     /// A `header('Location: ...')` call no `exit` has followed on some path to here.
     pub redirect_pending: Option<php_ast::Span>,
 
+    /// A redirect sent in one branch of a condition but not the other, which flows on into
+    /// the code after the condition.
+    pub redirect_fallthrough: Option<php_ast::Span>,
+
     /// A condition has pinned `$_SERVER['HTTP_ORIGIN']` itself, as an allowlist check would.
     pub origin_checked: bool,
 
@@ -939,6 +943,7 @@ impl FlowState {
             summarizing_taint: false,
             ignore_taint_guards: false,
             redirect_pending: None,
+            redirect_fallthrough: None,
             origin_checked: false,
             upload_checked: false,
             cors_credentials: false,
@@ -3230,6 +3235,13 @@ impl FlowState {
         result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
         result.non_html_response = if_ctx.non_html_response && else_ctx.non_html_response;
         result.redirect_pending = if_ctx.redirect_pending.or(else_ctx.redirect_pending);
+        result.redirect_fallthrough = if_ctx
+            .redirect_fallthrough
+            .or(else_ctx.redirect_fallthrough)
+            .or(match (if_ctx.redirect_pending, else_ctx.redirect_pending) {
+                (Some(redirect), None) | (None, Some(redirect)) => Some(redirect),
+                _ => None,
+            });
         result.origin_checked = if_ctx.origin_checked || else_ctx.origin_checked;
         result.upload_checked = if_ctx.upload_checked || else_ctx.upload_checked;
         result.cors_credentials = if_ctx.cors_credentials || else_ctx.cors_credentials;
