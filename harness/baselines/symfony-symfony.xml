@@ -1866,7 +1866,6 @@
   </file>
   <file src="src/Symfony/Contracts/HttpClient/Test/Fixtures/web/index.php">
     <TaintedHeader>
-      <code><![CDATA[header('X-Request-Vars: '.json_encode($vars, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE))]]></code>
       <code><![CDATA[header('Location: '.$location, true, 302)]]></code>
       <code><![CDATA[header($header)]]></code>
     </TaintedHeader>

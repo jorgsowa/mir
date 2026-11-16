@@ -3602,6 +3602,9 @@
     <TaintedCallable>
       <code><![CDATA[$this->moduleInstaller->install(array_keys($modules['install']))]]></code>
     </TaintedCallable>
+    <TaintedUnserialize>
+      <code><![CDATA[$this->buildRow($modules, $module, $distribution)]]></code>
+    </TaintedUnserialize>
     <UndefinedFunction>
       <code><![CDATA[drupal_install_profile_distribution_name()]]></code>
       <code><![CDATA[drupal_check_module($module)]]></code>

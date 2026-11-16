@@ -114,6 +114,24 @@ fn iterator_wrapper_taint(
     }
 }
 
+/// Laravel's `request('key')` helper, not a project function of the same name.
+pub fn is_laravel_request_helper_call(
+    fc: &php_ast::owned::FunctionCallExpr,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    let Some(name) = fc.name.kind.function_ref(db, file) else {
+        return false;
+    };
+    let lower_name = name
+        .global_name(db, file)
+        .map_or_else(String::new, crate::util::php_ident_lowercase);
+    is_request_helper_source(&lower_name, &fc.args)
+        && !name.find(db, file).is_some_and(|(_, func)| {
+            CalleeBody::of(func.location.as_ref(), file) == CalleeBody::Summarized
+        })
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum CalleeBody {
     /// Abstract, interface or stub: only annotations describe it.
@@ -842,7 +860,7 @@ pub fn expr_taint(
                 };
                 if reads_raw_request_body(&lower_name, &fc.args)
                     || reads_request_header_env(&lower_name, &fc.args)
-                    || (is_request_helper_source(&lower_name, &fc.args) && !is_project_function())
+                    || is_laravel_request_helper_call(fc, db, file)
                 {
                     return Taint::ALL;
                 }
@@ -861,6 +879,11 @@ pub fn expr_taint(
                             .without(safe)
                             | builtin_key_names_taint(&lower_name, &fc.args, ctx);
                     }
+                }
+                if crate::taint_guard::removes_line_breaks(&lower_name, &fc.args) {
+                    return builtin_args_taint(&lower_name, &fc.args, ctx, db, file)
+                        .without(Taint::HEADER)
+                        | builtin_key_names_taint(&lower_name, &fc.args, ctx);
                 }
                 if let Some(restored) = unescaped_kinds(&lower_name) {
                     return args_taint(&fc.args, ctx, db, file).restore(restored);
@@ -881,7 +904,7 @@ pub fn expr_taint(
                         taint
                     };
                 }
-                // `JSON_HEX_TAG` encodes `<` and `>`, so the JSON can't open a tag.
+                // `JSON_HEX_TAG` also encodes `<` and `>`, so the JSON can't open a tag.
                 if lower_name == "json_encode" {
                     let taint = args_taint(&fc.args[..fc.args.len().min(1)], ctx, db, file)
                         | builtin_key_names_taint(&lower_name, &fc.args, ctx);
@@ -890,6 +913,8 @@ pub fn expr_taint(
                         .get(1)
                         .and_then(|a| a.value())
                         .is_some_and(|flags| has_flag(flags, "JSON_HEX_TAG"));
+                    // JSON escapes every control character, line breaks included.
+                    let taint = taint.without(Taint::HEADER);
                     return if hex_tag {
                         taint.without(Taint::HTML)
                     } else {
@@ -1049,8 +1074,12 @@ pub fn expr_taint(
             let mut receiver_flows = true;
             let (mut ignoring_receiver, mut objects) = (0, 0);
             for atom in &recv_ty.types {
-                let mir_types::Atomic::TNamedObject { fqcn, .. } = atom else {
-                    continue;
+                // A fluent `with*()` call returns `static`, the receiver's own class.
+                let fqcn = match atom {
+                    mir_types::Atomic::TNamedObject { fqcn, .. }
+                    | mir_types::Atomic::TStaticObject { fqcn }
+                    | mir_types::Atomic::TSelf { fqcn } => fqcn,
+                    _ => continue,
                 };
                 objects += 1;
                 // Laravel's `route()` without a key returns the `Route` object.

@@ -46,3 +46,14 @@ function fixedPath(): void {
     $target = $uri->withPath('/v1/status');
     curl_init($target->toString());
 }
+
+function chained(): void {
+    $uri = Uri::parse('https://api.example.com/');
+    curl_init($uri->withHost($_GET['host'])->toString());
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSsrf: Tainted URL — possible server-side request forgery
+}
+
+function chainedFromParse(): void {
+    curl_init(Uri::parse('https://api.example.com/')?->withHost($_GET['host'])->toString());
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSsrf: Tainted URL — possible server-side request forgery
+}

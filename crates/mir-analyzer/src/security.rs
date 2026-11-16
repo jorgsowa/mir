@@ -558,8 +558,8 @@ pub(crate) fn is_request_value(
 }
 
 /// Request data read through a framework, possibly cast or trimmed: a Symfony `Request` accessor
-/// or parameter bag (`$request->query->getInt('n')`), a Laravel request or `Request` facade
-/// (`$request->input('n')`), or a PSR-7 server request (`$request->getQueryParams()['n']`).
+/// or parameter bag (`$request->query->getInt('n')`), a Laravel request, `Request` facade or
+/// `request('n')` helper, or a PSR-7 server request (`$request->getQueryParams()['n']`).
 pub(crate) fn reads_framework_request(
     expr: &Expr,
     ctx: &FlowState,
@@ -592,8 +592,9 @@ fn framework_request_read(
         ExprKind::NullCoalesce(nc) => recurse(&nc.left),
         ExprKind::ArrayAccess(aa) => recurse(&aa.array),
         ExprKind::FunctionCall(fc) => {
-            named_one_of(&fc.name, &["trim", "intval", "strval", "floatval"])
-                && fc.args.first().and_then(|a| a.value()).is_some_and(recurse)
+            crate::taint::is_laravel_request_helper_call(fc, db, file)
+                || named_one_of(&fc.name, &["trim", "intval", "strval", "floatval"])
+                    && fc.args.first().and_then(|a| a.value()).is_some_and(recurse)
         }
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             let ExprKind::Identifier(method) = &mc.method.kind else {

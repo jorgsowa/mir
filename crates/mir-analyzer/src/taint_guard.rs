@@ -379,6 +379,70 @@ fn class_chars(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<C
     }
 }
 
+/// Whether `str_replace()`, `str_ireplace()`, `strtr()` or `addcslashes()` leaves no carriage
+/// return or line feed in its result, so the value can't start a new line of a header or log.
+pub fn removes_line_breaks(fn_name_lower: &str, args: &[Arg]) -> bool {
+    if args.iter().any(|a| a.name.is_some() || a.unpack()) {
+        return false;
+    }
+    let strings = |index: usize| -> Option<Vec<&str>> {
+        match &args.get(index)?.value()?.kind {
+            ExprKind::String(s) => Some(vec![s.as_str()]),
+            ExprKind::Array(entries) => entries
+                .iter()
+                .map(|e| match &e.value().kind {
+                    ExprKind::String(s) if e.key.is_none() => Some(s.as_str()),
+                    _ => None,
+                })
+                .collect(),
+            _ => None,
+        }
+    };
+    let breaks_gone = |searched: &[&str], replacements: &[&str]| {
+        ["\r", "\n"].iter().all(|c| searched.contains(c))
+            && replacements.iter().all(|r| !r.contains(['\r', '\n']))
+    };
+    match fn_name_lower {
+        "str_replace" | "str_ireplace" if args.len() == 3 => {
+            matches!((strings(0), strings(1)), (Some(search), Some(replace)) if breaks_gone(&search, &replace))
+        }
+        "strtr" if args.len() == 3 => {
+            let (Some(from), Some(to)) = (string_arg(args, 1), string_arg(args, 2)) else {
+                return false;
+            };
+            // Each character of `from` maps to the one at the same position of `to`.
+            ['\r', '\n'].iter().all(|c| {
+                from.chars()
+                    .position(|f| f == *c)
+                    .is_some_and(|i| to.chars().nth(i).is_some_and(|t| t != '\r' && t != '\n'))
+            })
+        }
+        "strtr" if args.len() == 2 => {
+            let Some(ExprKind::Array(entries)) =
+                args.get(1).and_then(|a| a.value()).map(|v| &v.kind)
+            else {
+                return false;
+            };
+            let mut searched = Vec::new();
+            let mut replacements = Vec::new();
+            for entry in entries.iter() {
+                match (entry.key.as_ref().map(|k| &k.kind), &entry.value().kind) {
+                    (Some(ExprKind::String(from)), ExprKind::String(to)) => {
+                        searched.push(from.as_str());
+                        replacements.push(to.as_str());
+                    }
+                    _ => return false,
+                }
+            }
+            breaks_gone(&searched, &replacements)
+        }
+        "addcslashes" if args.len() == 2 => {
+            string_arg(args, 1).is_some_and(|list| list.contains('\r') && list.contains('\n'))
+        }
+        _ => false,
+    }
+}
+
 fn string_arg(args: &[Arg], index: usize) -> Option<&str> {
     match &args.get(index)?.value()?.kind {
         ExprKind::String(s) => Some(s.as_str()),
