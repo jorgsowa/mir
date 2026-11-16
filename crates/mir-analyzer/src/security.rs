@@ -810,55 +810,17 @@ pub(crate) fn is_host_derived(expr: &Expr, ctx: &FlowState) -> bool {
     }
 }
 
-/// Forget origins a condition may have validated: a variable compared with something,
-/// looked up in a list or matched against a pattern.
-pub(crate) fn forget_checked_origins(cond: &Expr, ctx: &mut FlowState) {
-    let operands: Vec<&Expr> = match &cond.kind {
-        ExprKind::Binary(b)
-            if matches!(
-                b.op,
-                php_ast::ast::BinaryOp::Identical
-                    | php_ast::ast::BinaryOp::NotIdentical
-                    | php_ast::ast::BinaryOp::Equal
-                    | php_ast::ast::BinaryOp::NotEqual
-                    | php_ast::ast::BinaryOp::Less
-                    | php_ast::ast::BinaryOp::LessOrEqual
-                    | php_ast::ast::BinaryOp::Greater
-                    | php_ast::ast::BinaryOp::GreaterOrEqual
-                    | php_ast::ast::BinaryOp::Spaceship
-            ) =>
-        {
-            vec![&b.left, &b.right]
-        }
-        ExprKind::FunctionCall(fc) => {
-            let index = if named_one_of(&fc.name, &["in_array", "array_key_exists", "array_search"])
-            {
-                0
-            } else if named_one_of(&fc.name, &["preg_match"]) {
-                1
-            } else {
-                return;
-            };
-            fc.args
-                .get(index)
-                .and_then(|a| a.value())
-                .into_iter()
-                .collect()
-        }
-        ExprKind::Isset(items) => items
-            .iter()
-            .filter_map(|item| match &item.kind {
-                ExprKind::ArrayAccess(aa) => aa.index.as_ref(),
-                _ => None,
-            })
-            .collect(),
-        _ => return,
+/// Forget the origins a condition validates on the branch where it evaluates to `holds`:
+/// equality with a value, an allowlist lookup or an anchored pattern clears request, host and
+/// Origin header data; an upper bound clears request data used as an amount.
+pub(crate) fn forget_checked_origins(cond: &Expr, holds: bool, ctx: &mut FlowState) {
+    let Some((operands, bound_only)) = validated_operands(cond, holds) else {
+        return;
     };
     for operand in operands {
         let operand = match &operand.kind {
-            ExprKind::FunctionCall(fc)
-                if named_one_of(&fc.name, &["strlen", "mb_strlen", "trim"]) =>
-            {
+            ExprKind::Cast(_, inner) | ExprKind::Parenthesized(inner) => inner,
+            ExprKind::FunctionCall(fc) if !bound_only && named_one_of(&fc.name, &["trim"]) => {
                 match fc.args.first().and_then(|a| a.value()) {
                     Some(inner) => inner,
                     None => continue,
@@ -866,10 +828,186 @@ pub(crate) fn forget_checked_origins(cond: &Expr, ctx: &mut FlowState) {
             }
             _ => operand,
         };
-        if let ExprKind::Variable(var) = &operand.kind {
-            ctx.forget_value_origin(var, ValueOrigin::HostHeader);
-            ctx.forget_value_origin(var, ValueOrigin::RequestInput);
+        match &operand.kind {
+            ExprKind::Variable(var) => {
+                ctx.forget_value_origin(var, ValueOrigin::RequestInput);
+                if !bound_only {
+                    ctx.forget_value_origin(var, ValueOrigin::HostHeader);
+                    ctx.forget_value_origin(var, ValueOrigin::OriginHeader);
+                }
+            }
+            _ if !bound_only && is_request_origin(operand, ctx) => ctx.origin_checked = true,
+            _ => {}
         }
+    }
+}
+
+/// The operands `cond` validates when it evaluates to `holds`, and whether it only bounds them
+/// from above rather than pinning them to known values.
+fn validated_operands(cond: &Expr, holds: bool) -> Option<(Vec<&Expr>, bool)> {
+    use php_ast::ast::BinaryOp;
+    let is_unset = |e: &Expr| match &e.kind {
+        ExprKind::String(s) => s.is_empty(),
+        ExprKind::Null | ExprKind::Bool(_) => true,
+        _ => false,
+    };
+    match &cond.kind {
+        ExprKind::Binary(b) => match b.op {
+            BinaryOp::Identical | BinaryOp::Equal | BinaryOp::NotIdentical | BinaryOp::NotEqual => {
+                let equal = matches!(b.op, BinaryOp::Identical | BinaryOp::Equal);
+                (equal == holds && !is_unset(&b.left) && !is_unset(&b.right))
+                    .then(|| (vec![&b.left, &b.right], false))
+            }
+            // `$n < 100` holding, or `$n > 100` failing, caps `$n`; the mirrored forms cap the
+            // right operand.
+            BinaryOp::Less | BinaryOp::LessOrEqual => {
+                Some((vec![if holds { &b.left } else { &b.right }], true))
+            }
+            BinaryOp::Greater | BinaryOp::GreaterOrEqual => {
+                Some((vec![if holds { &b.right } else { &b.left }], true))
+            }
+            _ => None,
+        },
+        ExprKind::FunctionCall(fc) if holds => {
+            let index = if named_one_of(&fc.name, &["in_array", "array_key_exists", "array_search"])
+            {
+                0
+            } else if named_one_of(&fc.name, &["preg_match"])
+                && literal_str(arg(&fc.args, 0, "pattern")).is_none_or(is_anchored_pattern)
+            {
+                1
+            } else if named_one_of(&fc.name, &["str_ends_with"])
+                && literal_str(arg(&fc.args, 1, "needle")).is_some_and(|n| n.starts_with('.'))
+            {
+                0
+            } else if fc.name.kind.name_bare().is_some_and(|n| {
+                !crate::stubs::is_builtin_function(&n.trim_start_matches('\\').to_ascii_lowercase())
+            }) {
+                // A helper of the program's own, such as `isAllowedOrigin($origin)`, is taken
+                // to check every value it's given.
+                return Some((call_values(&fc.args), false));
+            } else {
+                return None;
+            };
+            Some((
+                fc.args
+                    .get(index)
+                    .and_then(|a| a.value())
+                    .into_iter()
+                    .collect(),
+                false,
+            ))
+        }
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) if holds => {
+            Some((call_values(&mc.args), false))
+        }
+        ExprKind::StaticMethodCall(sc) if holds => Some((call_values(&sc.args), false)),
+        ExprKind::Isset(items) if holds => Some((
+            items
+                .iter()
+                .filter_map(|item| match &item.kind {
+                    ExprKind::ArrayAccess(aa) => aa.index.as_ref(),
+                    _ => None,
+                })
+                .collect(),
+            false,
+        )),
+        _ => None,
+    }
+}
+
+fn call_values(args: &[Arg]) -> Vec<&Expr> {
+    args.iter().filter_map(|a| a.value()).collect()
+}
+
+/// A regex that must match the whole subject: `^...$` or `\A...\z`.
+fn is_anchored_pattern(pattern: &str) -> bool {
+    let Some(delimiter) = pattern.chars().next() else {
+        return false;
+    };
+    let closing = match delimiter {
+        '(' => ')',
+        '{' => '}',
+        '[' => ']',
+        '<' => '>',
+        other => other,
+    };
+    let Some(end) = pattern.rfind(closing).filter(|&end| end > 0) else {
+        return false;
+    };
+    let body = &pattern[delimiter.len_utf8()..end];
+    (body.starts_with('^') || body.starts_with("\\A"))
+        && (body.ends_with('$') || body.ends_with("\\z") || body.ends_with("\\Z"))
+}
+
+/// Mark a variable a condition proves non-empty on the branch where it evaluates to `holds`:
+/// a truthy or `empty()` check, a comparison with `''`, or a length of at least one.
+pub(crate) fn mark_non_empty(cond: &Expr, holds: bool, ctx: &mut FlowState) {
+    use php_ast::ast::BinaryOp;
+    let var = match &cond.kind {
+        ExprKind::Variable(var) if holds => Some(var),
+        ExprKind::Empty(inner) if !holds => match &inner.kind {
+            ExprKind::Variable(var) => Some(var),
+            _ => None,
+        },
+        ExprKind::Binary(b) => {
+            let empty_string = |e: &Expr| matches!(&e.kind, ExprKind::String(s) if s.is_empty());
+            let equal = matches!(b.op, BinaryOp::Identical | BinaryOp::Equal);
+            let unequal = matches!(b.op, BinaryOp::NotIdentical | BinaryOp::NotEqual);
+            match (&b.left.kind, &b.right.kind) {
+                (ExprKind::Variable(var), _) | (_, ExprKind::Variable(var))
+                    if (equal || unequal)
+                        && equal != holds
+                        && (empty_string(&b.left) || empty_string(&b.right)) =>
+                {
+                    Some(var)
+                }
+                (ExprKind::FunctionCall(fc), ExprKind::Int(bound))
+                    if named_one_of(&fc.name, &["strlen", "mb_strlen"])
+                        && length_at_least_one(b.op, *bound, holds) =>
+                {
+                    match fc.args.first().and_then(|a| a.value()).map(|v| &v.kind) {
+                        Some(ExprKind::Variable(var)) => Some(var),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+    if let Some(var) = var {
+        ctx.mark_value_origin(var, ValueOrigin::NonEmpty);
+    }
+}
+
+/// Whether `strlen($v) <op> bound` evaluating to `holds` means `$v` has at least one byte.
+fn length_at_least_one(op: php_ast::ast::BinaryOp, bound: i64, holds: bool) -> bool {
+    use php_ast::ast::BinaryOp;
+    match (op, holds) {
+        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => bound >= 0,
+        (BinaryOp::GreaterOrEqual, true)
+        | (BinaryOp::Less, false)
+        | (BinaryOp::Identical | BinaryOp::Equal, true)
+        | (BinaryOp::NotIdentical | BinaryOp::NotEqual, false) => bound >= 1,
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, true)
+        | (BinaryOp::Identical | BinaryOp::Equal, false) => bound == 0,
+        _ => false,
+    }
+}
+
+/// Whether `value` holds request data: by its taint when taint analysis runs, else by origin.
+fn holds_request_data(
+    ea: &crate::expr::ExpressionAnalyzer<'_>,
+    value: &Expr,
+    ctx: &FlowState,
+) -> bool {
+    if ea.db.taint_analysis() {
+        !crate::taint::expr_taint(value, ctx, ea.db, &ea.file)
+            .concrete()
+            .is_empty()
+    } else {
+        is_request_input(value, ctx)
     }
 }
 
@@ -1124,10 +1262,7 @@ pub(crate) fn check_deny_list_match(
         let Some(failure) = pattern_failure(pattern) else {
             continue;
         };
-        if crate::taint::expr_taint(subject, ctx, ea.db, &ea.file)
-            .concrete()
-            .is_empty()
-        {
+        if !holds_request_data(ea, subject, ctx) {
             continue;
         }
         ea.emit(
@@ -1245,11 +1380,11 @@ pub(crate) fn check_ldap_bind(
     let (Some(password), Some(ty)) = (args[index].value(), arg_types.get(index)) else {
         return;
     };
+    let checked_non_empty = matches!(&password.kind, ExprKind::Variable(v) if ctx.has_value_origin(v, ValueOrigin::NonEmpty));
     if ty.can_be_falsy()
+        && !checked_non_empty
         && is_request_input(password, ctx)
-        && !crate::taint::expr_taint(password, ctx, ea.db, &ea.file)
-            .concrete()
-            .is_empty()
+        && holds_request_data(ea, password, ctx)
     {
         ea.emit(
             mir_issues::IssueKind::LdapAnonymousBind,
@@ -1400,39 +1535,6 @@ pub(crate) fn is_request_origin(expr: &Expr, ctx: &FlowState) -> bool {
         }
         ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => is_request_origin(inner, ctx),
         ExprKind::NullCoalesce(nc) => is_request_origin(&nc.left, ctx),
-        _ => false,
-    }
-}
-
-/// Whether a condition checks the request's `Origin` header's value; `isset()`, `empty()` and
-/// comparisons with an empty value only check that it was sent.
-pub(crate) fn mentions_request_origin(expr: &Expr, ctx: &FlowState) -> bool {
-    if is_request_origin(expr, ctx) {
-        return true;
-    }
-    let args_mention = |args: &[Arg]| {
-        args.iter()
-            .filter_map(|a| a.value())
-            .any(|v| mentions_request_origin(v, ctx))
-    };
-    match &expr.kind {
-        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => {
-            mentions_request_origin(inner, ctx)
-        }
-        ExprKind::UnaryPrefix(u) => mentions_request_origin(&u.operand, ctx),
-        ExprKind::Binary(b) => {
-            let empty = |e: &Expr| match &e.kind {
-                ExprKind::String(s) => s.is_empty(),
-                ExprKind::Null | ExprKind::Bool(_) => true,
-                _ => false,
-            };
-            !empty(&b.left)
-                && !empty(&b.right)
-                && (mentions_request_origin(&b.left, ctx) || mentions_request_origin(&b.right, ctx))
-        }
-        ExprKind::FunctionCall(fc) => args_mention(&fc.args),
-        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => args_mention(&mc.args),
-        ExprKind::StaticMethodCall(sc) => args_mention(&sc.args),
         _ => false,
     }
 }

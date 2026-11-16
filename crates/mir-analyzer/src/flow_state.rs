@@ -3128,7 +3128,10 @@ impl FlowState {
                     .collect(),
             );
         }
-        if !(if_ctx.value_origins.is_empty() && else_ctx.value_origins.is_empty()) {
+        if if_ctx.value_origins.is_empty() && else_ctx.value_origins.is_empty() {
+            // `result` starts from `pre`, whose origins neither branch kept.
+            result.value_origins = Arc::clone(&if_ctx.value_origins);
+        } else {
             result.value_origins = Arc::new(
                 if_ctx
                     .value_origins
