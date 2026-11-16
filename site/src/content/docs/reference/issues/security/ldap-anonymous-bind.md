@@ -7,7 +7,7 @@ sidebar:
   order: 835
 ---
 
-LDAP servers treat a simple bind with a DN and an empty password as an unauthenticated (anonymous) bind, and report it as a success. A login that checks only whether `ldap_bind($conn, $dn, $_POST['password'])` returned true lets anyone in with an empty password. Reported when the password argument is tainted and its type still allows an empty or falsy value: no `=== ''`, `empty()` or `strlen()` check narrowed it first.
+LDAP servers treat a simple bind with a DN and an empty password as an unauthenticated (anonymous) bind, and report it as a success. A login that checks only whether `ldap_bind($conn, $dn, $_POST['password'])` returned true lets anyone in with an empty password. Reported when the password argument is tainted and its type still allows an empty or falsy value: no `=== ''`, `empty()`, falsy or `strlen()` check ruled it out first.
 
 ## Example
 

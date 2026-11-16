@@ -7,7 +7,7 @@ sidebar:
   order: 827
 ---
 
-The client chooses the `Host` header. A password-reset or confirmation link built from it, `"https://{$_SERVER['HTTP_HOST']}/reset?token=$token"`, points the victim's email at the attacker's server, and the token arrives there when the victim clicks it: account takeover. Reported for a `mail()` or `mb_send_mail()` message containing `$_SERVER['HTTP_HOST']`, `$_SERVER['HTTP_X_FORWARDED_HOST']`, `getHttpHost()` or `getSchemeAndHttpHost()`, directly or through variables and string building. A host compared with an expected value or checked against a list first isn't reported.
+The client chooses the `Host` header. A password-reset or confirmation link built from it, `"https://{$_SERVER['HTTP_HOST']}/reset?token=$token"`, points the victim's email at the attacker's server, and the token arrives there when the victim clicks it: account takeover. Reported for a `mail()` or `mb_send_mail()` message containing `$_SERVER['HTTP_HOST']`, `$_SERVER['HTTP_X_FORWARDED_HOST']`, `getHttpHost()` or `getSchemeAndHttpHost()`, directly or through variables and string building. A host compared with an expected value, checked against a list or with a `.domain` suffix first isn't reported; a check that it's set or short enough doesn't count.
 
 ## Example
 

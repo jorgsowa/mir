@@ -7,7 +7,7 @@ sidebar:
   order: 831
 ---
 
-A client that picks how much work a request does can tie up memory or workers with one request (CWE-400). Reported when a request value, directly or through a variable, reaches the count of `str_repeat()`, `str_pad()`, `range()` (its end), `array_fill()` or `array_pad()`, or the duration of `sleep()`, `usleep()`, `time_nanosleep()` or `set_time_limit()`. An `(int)` cast or `intval()` doesn't help, since the number itself is the problem. A value compared with a bound first, or clamped with `min()`, isn't reported.
+A client that picks how much work a request does can tie up memory or workers with one request (CWE-400). Reported when a request value, directly or through a variable, reaches the count of `str_repeat()`, `str_pad()`, `range()` (its end), `array_fill()` or `array_pad()`, or the duration of `sleep()`, `usleep()`, `time_nanosleep()` or `set_time_limit()`. An `(int)` cast or `intval()` doesn't help, since the number itself is the problem. A value capped first, by an upper-bound check that returns or clamps it (`if ($n > 100) { $n = 100; }`) or by `min()`, isn't reported. A lower bound or a `!== 0` check doesn't cap it.
 
 ## Example
 

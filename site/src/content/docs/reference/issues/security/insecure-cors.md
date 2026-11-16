@@ -7,7 +7,7 @@ sidebar:
   order: 838
 ---
 
-`header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN'])` together with `Access-Control-Allow-Credentials: true` tells the browser that every site may read responses made with the user's cookies, so any page the user visits can read their data. Reported for such a header when the file also sends `Access-Control-Allow-Credentials: true` and no condition before it checked the origin's value (an allowlist lookup, a comparison or a validating call). A check that the header is present (`isset()`, `!== ''`) doesn't count. `Access-Control-Allow-Origin: *` with credentials isn't reported, since browsers refuse that combination.
+`header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN'])` together with `Access-Control-Allow-Credentials: true` tells the browser that every site may read responses made with the user's cookies, so any page the user visits can read their data. Reported for such a header when the same function also sends `Access-Control-Allow-Credentials: true`, before or after it, and no condition before it pinned that origin: a comparison with a value, an allowlist lookup, an anchored `preg_match()`, a `.domain` suffix check or a helper of the program's own. A presence check (`isset()`, `!== ''`) or a suffix without the leading dot (`str_ends_with($origin, 'trusted.com')` accepts `eviltrusted.com`) doesn't count. `Access-Control-Allow-Origin: *` with credentials isn't reported, since browsers refuse that combination.
 
 ## Example
 
