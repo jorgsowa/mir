@@ -423,6 +423,7 @@ impl DocblockParser {
                 "consistent-constructor"
                 | "psalm-consistent-constructor"
                 | "phpstan-consistent-constructor" => result.consistent_constructor = true,
+                "psalm-consistent-templates" => result.consistent_templates = true,
                 "psalm-internal" => {
                     result.is_internal = true;
                     result.internal_scope = body_text(tag.body.as_ref()).and_then(|b| {
@@ -821,6 +822,8 @@ pub struct ParsedDocblock {
     pub internal_scope: Option<String>,
     /// `@psalm-consistent-constructor` on a class.
     pub consistent_constructor: bool,
+    /// `@psalm-consistent-templates` on a class.
+    pub consistent_templates: bool,
     /// `@psalm-yield T` on a class: the value `yield $object` evaluates to.
     pub yield_type: Option<Type>,
     /// `@phpstan-sealed A|B` / `@psalm-inheritors A|B`.

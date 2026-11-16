@@ -294,6 +294,13 @@ impl<'a> ClassAnalyzer<'a> {
                     &mut issues,
                 );
             }
+            self.check_consistent_templates(
+                fqcn,
+                class,
+                parent_fqcn,
+                location.as_ref(),
+                &mut issues,
+            );
         }
 
         // The checks below look the class up by name; a same-named enum,
@@ -711,6 +718,51 @@ impl<'a> ClassAnalyzer<'a> {
                 location,
             );
         }
+    }
+
+    /// A child of a `@psalm-consistent-templates` class must redeclare the parent's
+    /// templates in order and pass each one through unchanged in `@extends`.
+    fn check_consistent_templates(
+        &self,
+        fqcn: &Arc<str>,
+        class: &crate::db::ClassLike,
+        parent_fqcn: &Arc<str>,
+        location: Option<&mir_types::Location>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let parent_here = crate::db::Fqcn::from_str(self.db, parent_fqcn.as_ref());
+        let Some(crate::db::ClassLike::Class(parent)) =
+            crate::db::find_class_like(self.db, parent_here)
+        else {
+            return;
+        };
+        if !parent.consistent_templates || parent.template_params.is_empty() {
+            return;
+        }
+        let own = class.template_params();
+        let args = class.extends_type_args();
+        let passes_through = own.len() == parent.template_params.len()
+            && args.len() == own.len()
+            && own.iter().zip(args).all(|(tp, arg)| {
+                matches!(
+                    arg.types.as_slice(),
+                    [mir_types::Atomic::TTemplateParam { name, .. }] if *name == tp.name
+                )
+            });
+        if passes_through {
+            return;
+        }
+        self.push_located_issue(
+            issues,
+            IssueKind::InvalidExtendClass {
+                parent: parent_fqcn.to_string(),
+                child: fqcn.to_string(),
+                reason: Some(format!(
+                    "Class {fqcn} extends {parent_fqcn}, which has consistent templates, so it must declare the same template parameters and pass them through unchanged"
+                )),
+            },
+            location,
+        );
     }
 
     // -----------------------------------------------------------------------

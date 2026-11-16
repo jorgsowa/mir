@@ -803,6 +803,9 @@ pub struct ClassDef {
     /// `@psalm-consistent-constructor`: subclass constructors must match this class's.
     #[serde(default)]
     pub consistent_constructor: bool,
+    /// `@psalm-consistent-templates`: subclasses must pass this class's templates through unchanged.
+    #[serde(default)]
+    pub consistent_templates: bool,
     /// `@psalm-yield T`: the value `yield $object` evaluates to.
     #[serde(default)]
     pub yield_type: Option<Type>,
