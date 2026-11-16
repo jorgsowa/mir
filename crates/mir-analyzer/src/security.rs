@@ -172,6 +172,134 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if let Some(reason) =
+        disabled_tls_verification(fn_name_lower, args).filter(|_| !ctx.tls_opt_out)
+    {
+        ea.emit(
+            mir_issues::IssueKind::InsecureTls { reason },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TLS verification
+// ---------------------------------------------------------------------------
+
+/// A curl option or `ssl` stream context option, written as a literal, that turns off checking
+/// the server's certificate or host name.
+fn disabled_tls_verification(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+    match fn_name_lower {
+        "curl_setopt" => curl_option_off(arg(args, 1, "option")?, arg(args, 2, "value")?),
+        "curl_setopt_array" => {
+            let ExprKind::Array(entries) = &arg(args, 1, "options")?.kind else {
+                return None;
+            };
+            entries
+                .iter()
+                .find_map(|e| curl_option_off(e.key.as_ref()?, e.value()))
+        }
+        "stream_context_create" => ssl_options_off(array_entry(arg(args, 0, "options")?, "ssl")?),
+        "stream_context_set_option" => {
+            let second = arg(args, 1, "wrapper_or_options")?;
+            if literal_str(Some(second)).is_some_and(|w| w.eq_ignore_ascii_case("ssl")) {
+                let name = literal_str(arg(args, 2, "option_name"))?;
+                ssl_option_off(name, arg(args, 3, "value")?)
+            } else {
+                ssl_options_off(array_entry(second, "ssl")?)
+            }
+        }
+        "stream_context_set_options" => {
+            ssl_options_off(array_entry(arg(args, 1, "options")?, "ssl")?)
+        }
+        _ => None,
+    }
+}
+
+/// A condition deciding on a TLS verification setting, such as `$options['verify'] === false`
+/// or `$this->sslVerify`: the code under it honours a caller's opt-out.
+pub(crate) fn mark_tls_opt_out(cond: &Expr, ctx: &mut FlowState) {
+    if mentions_tls_setting(cond) {
+        ctx.tls_opt_out = true;
+    }
+}
+
+fn mentions_tls_setting(expr: &Expr) -> bool {
+    let names_setting = |name: &str| {
+        let lower = name.to_ascii_lowercase();
+        ["verif", "ssl", "tls", "insecure", "cert"]
+            .iter()
+            .any(|w| lower.contains(w))
+    };
+    match &expr.kind {
+        ExprKind::Variable(v) => names_setting(v),
+        ExprKind::String(s) => names_setting(s.as_str()),
+        ExprKind::Identifier(name) => names_setting(name),
+        ExprKind::Name(_) => expr.kind.name_bare().is_some_and(names_setting),
+        ExprKind::ArrayAccess(aa) => {
+            mentions_tls_setting(&aa.array) || aa.index.as_ref().is_some_and(mentions_tls_setting)
+        }
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            mentions_tls_setting(&pa.object) || mentions_tls_setting(&pa.property)
+        }
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            mentions_tls_setting(&mc.method)
+                || call_values(&mc.args).into_iter().any(mentions_tls_setting)
+        }
+        ExprKind::FunctionCall(fc) => {
+            mentions_tls_setting(&fc.name)
+                || call_values(&fc.args).into_iter().any(mentions_tls_setting)
+        }
+        ExprKind::Binary(b) => mentions_tls_setting(&b.left) || mentions_tls_setting(&b.right),
+        ExprKind::UnaryPrefix(u) => mentions_tls_setting(&u.operand),
+        ExprKind::Parenthesized(inner) | ExprKind::Empty(inner) => mentions_tls_setting(inner),
+        ExprKind::Isset(items) => items.iter().any(mentions_tls_setting),
+        _ => false,
+    }
+}
+
+fn is_literal_off(value: &Expr) -> bool {
+    match &value.kind {
+        ExprKind::Bool(false) | ExprKind::Int(0) => true,
+        ExprKind::Parenthesized(inner) => is_literal_off(inner),
+        _ => false,
+    }
+}
+
+fn curl_option_off(option: &Expr, value: &Expr) -> Option<String> {
+    let what = match option.kind.name_bare()? {
+        "CURLOPT_SSL_VERIFYPEER" => "any certificate is accepted",
+        "CURLOPT_SSL_VERIFYHOST" => "a certificate for any host is accepted",
+        "CURLOPT_PROXY_SSL_VERIFYPEER" => "any proxy certificate is accepted",
+        "CURLOPT_PROXY_SSL_VERIFYHOST" => "a proxy certificate for any host is accepted",
+        _ => return None,
+    };
+    is_literal_off(value).then(|| {
+        format!(
+            "{} is off, so {what}",
+            option.kind.name_bare().unwrap_or_default()
+        )
+    })
+}
+
+fn ssl_options_off(ssl: &Expr) -> Option<String> {
+    let ExprKind::Array(entries) = &ssl.kind else {
+        return None;
+    };
+    entries.iter().find_map(|e| {
+        let name = literal_str(e.key.as_ref())?;
+        ssl_option_off(name, e.value())
+    })
+}
+
+fn ssl_option_off(name: &str, value: &Expr) -> Option<String> {
+    let what = match name {
+        "verify_peer" => "any certificate is accepted",
+        "verify_peer_name" => "a certificate for any host is accepted",
+        _ => return None,
+    };
+    is_literal_off(value).then(|| format!("ssl option {name} is off, so {what}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -380,7 +508,8 @@ pub(crate) fn assigned_origins(value: &Expr, ctx: &FlowState) -> OriginSet {
             None => {}
         }
     }
-    let checks: [(OriginCheck, ValueOrigin); 7] = [
+    let checks: [(OriginCheck, ValueOrigin); 8] = [
+        (is_mac_digest, ValueOrigin::MacDigest),
         (is_weak_random, ValueOrigin::WeakRandom),
         (is_decoded, ValueOrigin::Decoded),
         (is_request_origin, ValueOrigin::OriginHeader),
@@ -1226,6 +1355,98 @@ pub(crate) fn check_condition(
             );
         }
     }
+}
+
+/// Report a `==`/`===` comparison that leaks through its timing a `hash_hmac()` digest compared
+/// with a non-literal value, or a value named for a secret compared with request data.
+pub(crate) fn check_timing_unsafe_comparison(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    b: &php_ast::owned::BinaryExpr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    use php_ast::ast::BinaryOp;
+    let op = match b.op {
+        BinaryOp::Equal => "==",
+        BinaryOp::Identical => "===",
+        BinaryOp::NotEqual => "!=",
+        BinaryOp::NotIdentical => "!==",
+        _ => return,
+    };
+    if let Some(what) = timing_unsafe_operand(b, ctx) {
+        ea.emit(
+            mir_issues::IssueKind::TimingUnsafeComparison {
+                what: format!("{what} is compared with {op}"),
+            },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
+}
+
+fn timing_unsafe_operand(b: &php_ast::owned::BinaryExpr, ctx: &FlowState) -> Option<String> {
+    let is_literal = |e: &Expr| {
+        matches!(
+            e.kind,
+            ExprKind::String(_) | ExprKind::Int(_) | ExprKind::Bool(_) | ExprKind::Null
+        )
+    };
+    for (one, other) in [(&b.left, &b.right), (&b.right, &b.left)] {
+        if is_mac_digest(one, ctx) && !is_literal(other) {
+            return Some("a hash_hmac() digest".to_string());
+        }
+        if is_request_input(other, ctx) && !is_request_input(one, ctx) {
+            if let Some(name) = stored_secret_name(one) {
+                return Some(format!("the secret {name}"));
+            }
+        }
+    }
+    None
+}
+
+/// A `hash_hmac()` call, possibly hex- or base64-encoded, or a variable holding one.
+fn is_mac_digest(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(v) => ctx.has_value_origin(v, ValueOrigin::MacDigest),
+        ExprKind::Parenthesized(inner) => is_mac_digest(inner, ctx),
+        ExprKind::FunctionCall(fc) => {
+            named_one_of(&fc.name, &["hash_hmac"])
+                || named_one_of(
+                    &fc.name,
+                    &[
+                        "bin2hex",
+                        "base64_encode",
+                        "strtolower",
+                        "strtoupper",
+                        "rtrim",
+                        "strtr",
+                    ],
+                ) && fc
+                    .args
+                    .first()
+                    .and_then(|a| a.value())
+                    .is_some_and(|v| is_mac_digest(v, ctx))
+        }
+        _ => false,
+    }
+}
+
+/// The variable, property or literal array key naming a stored secret: `$_SESSION['csrf_token']`,
+/// `$this->apiKey`, `$secret`.
+fn stored_secret_name(expr: &Expr) -> Option<String> {
+    let name = match &expr.kind {
+        ExprKind::Variable(v) => v.trim_start_matches('$').to_string(),
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            match &pa.property.kind {
+                ExprKind::Identifier(name) => name.to_string(),
+                _ => return None,
+            }
+        }
+        ExprKind::ArrayAccess(aa) => literal_str(aa.index.as_ref())?.to_string(),
+        ExprKind::Parenthesized(inner) => return stored_secret_name(inner),
+        _ => return None,
+    };
+    names_secret(&name).then_some(name)
 }
 
 /// A verification result and the value that alone means success.

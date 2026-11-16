@@ -197,6 +197,8 @@ issues keep their code.
 | MIR0838  | InsecureCors                  | [security/insecure-cors](../security/insecure-cors/) |
 | MIR0839  | PredictableSeed               | [security/predictable-seed](../security/predictable-seed/) |
 | MIR0840  | ObfuscatedCode                | [security/obfuscated-code](../security/obfuscated-code/) |
+| MIR0841  | InsecureTls                   | [security/insecure-tls](../security/insecure-tls/) |
+| MIR0842  | TimingUnsafeComparison        | [security/timing-unsafe-comparison](../security/timing-unsafe-comparison/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

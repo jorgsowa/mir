@@ -204,6 +204,7 @@ pub fn narrow_from_condition(
         crate::security::forget_checked_origins(expr, is_true, ctx);
         crate::security::mark_non_empty(expr, is_true, ctx);
         crate::security::mark_upload_checked(expr, ctx);
+        crate::security::mark_tls_opt_out(expr, ctx);
         crate::taint::mark_dash_checked(expr, is_true, ctx);
     }
     if let Some(var) = crate::taint::proven_object(expr, is_true) {

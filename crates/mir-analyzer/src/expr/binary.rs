@@ -130,6 +130,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         use BinaryOp as B;
+        crate::security::check_timing_unsafe_comparison(self, b, ctx, span);
         if matches!(
             b.op,
             B::BooleanAnd | B::LogicalAnd | B::BooleanOr | B::LogicalOr

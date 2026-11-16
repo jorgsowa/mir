@@ -843,6 +843,16 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/obfuscated_code/`.
     ObfuscatedCode,
 
+    /// A curl or stream context option turns off checking the server's TLS certificate or host name.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/insecure_tls/`.
+    InsecureTls { reason: String },
+
+    /// A `hash_hmac()` digest or a stored secret is compared with `==` or `===` instead of `hash_equals()`.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/timing_unsafe_comparison/`.
+    TimingUnsafeComparison { what: String },
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1312,6 +1322,8 @@ impl IssueKind {
             | IssueKind::InsecureCors
             | IssueKind::PredictableSeed { .. }
             | IssueKind::ObfuscatedCode
+            | IssueKind::InsecureTls { .. }
+            | IssueKind::TimingUnsafeComparison { .. }
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1607,6 +1619,8 @@ impl IssueKind {
             IssueKind::InsecureCors => "MIR0838",
             IssueKind::PredictableSeed { .. } => "MIR0839",
             IssueKind::ObfuscatedCode => "MIR0840",
+            IssueKind::InsecureTls { .. } => "MIR0841",
+            IssueKind::TimingUnsafeComparison { .. } => "MIR0842",
             IssueKind::TaintedInput { .. } => "MIR0800",
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
@@ -1739,7 +1753,7 @@ impl IssueKind {
             | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" | "MIR0820"
             | "MIR0821" | "MIR0822" | "MIR0825" | "MIR0826" | "MIR0827" | "MIR0831" | "MIR0832"
             | "MIR0833" | "MIR0834" | "MIR0835" | "MIR0836" | "MIR0837" | "MIR0838" | "MIR0839"
-            | "MIR0840" => Some(Severity::Warning),
+            | "MIR0840" | "MIR0841" | "MIR0842" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1946,6 +1960,8 @@ impl IssueKind {
             IssueKind::InsecureCors => "InsecureCors",
             IssueKind::PredictableSeed { .. } => "PredictableSeed",
             IssueKind::ObfuscatedCode => "ObfuscatedCode",
+            IssueKind::InsecureTls { .. } => "InsecureTls",
+            IssueKind::TimingUnsafeComparison { .. } => "TimingUnsafeComparison",
             IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
@@ -2722,6 +2738,8 @@ impl IssueKind {
             IssueKind::InsecureCors => "CORS reflects the request's Origin while allowing credentials — any site can read authenticated responses".to_string(),
             IssueKind::PredictableSeed { function } => format!("{function}() seeds the generator with a guessable value, so every mt_rand() and rand() result after it is predictable"),
             IssueKind::ObfuscatedCode => "Code run from decoded data — the shape of a web shell or backdoor".to_string(),
+            IssueKind::InsecureTls { reason } => format!("TLS verification disabled: {reason} and anyone on the network can intercept the connection"),
+            IssueKind::TimingUnsafeComparison { what } => format!("{what}, which returns sooner the fewer leading characters match; use hash_equals()"),
             IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
@@ -3579,6 +3597,8 @@ mod code_tests {
             },
             IssueKind::MissingSensitiveParameter { param: s() },
             IssueKind::ObfuscatedCode,
+            IssueKind::InsecureTls { reason: s() },
+            IssueKind::TimingUnsafeComparison { what: s() },
             IssueKind::PredictableSeed { function: s() },
             IssueKind::InsecureCors,
             IssueKind::HardcodedCredential { what: s() },
@@ -3796,6 +3816,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 221);
+        assert_eq!(one_of_each().len(), 223);
     }
 }

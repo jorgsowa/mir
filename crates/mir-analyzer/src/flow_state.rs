@@ -124,6 +124,8 @@ pub enum ValueOrigin {
     NoSqlWhere,
     /// A value read from `$_COOKIE`.
     CookieInput,
+    /// A `hash_hmac()` digest, possibly hex- or base64-encoded.
+    MacDigest,
 }
 
 impl ValueOrigin {
@@ -139,21 +141,21 @@ impl ValueOrigin {
 
 /// The [`ValueOrigin`]s one variable holds at once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct OriginSet(u16);
+pub struct OriginSet(u32);
 
 impl OriginSet {
     pub const EMPTY: OriginSet = OriginSet(0);
 
     pub const fn with(self, origin: ValueOrigin) -> Self {
-        OriginSet(self.0 | (1 << origin as u16))
+        OriginSet(self.0 | (1 << origin as u32))
     }
 
     pub const fn without(self, origin: ValueOrigin) -> Self {
-        OriginSet(self.0 & !(1 << origin as u16))
+        OriginSet(self.0 & !(1 << origin as u32))
     }
 
     pub const fn contains(self, origin: ValueOrigin) -> bool {
-        self.0 & (1 << origin as u16) != 0
+        self.0 & (1 << origin as u32) != 0
     }
 
     pub const fn is_empty(self) -> bool {
@@ -445,6 +447,9 @@ pub struct FlowState {
 
     /// An uploaded file's extension or content has been checked on some path to here.
     pub upload_checked: bool,
+
+    /// Inside a branch of a condition on a TLS verification setting, which honours an opt-out.
+    pub tls_opt_out: bool,
 
     /// `Access-Control-Allow-Credentials: true` has been sent on some path to here.
     pub cors_credentials: bool,
@@ -954,6 +959,7 @@ impl FlowState {
             redirect_fallthrough: None,
             origin_checked: false,
             upload_checked: false,
+            tls_opt_out: false,
             cors_credentials: false,
             cors_reflection: None,
             byref_out_slots: Arc::default(),
@@ -3252,6 +3258,7 @@ impl FlowState {
             });
         result.origin_checked = if_ctx.origin_checked || else_ctx.origin_checked;
         result.upload_checked = if_ctx.upload_checked || else_ctx.upload_checked;
+        result.tls_opt_out = pre.tls_opt_out;
         result.cors_credentials = if_ctx.cors_credentials || else_ctx.cors_credentials;
         result.cors_reflection = if_ctx.cors_reflection.or(else_ctx.cors_reflection);
 
