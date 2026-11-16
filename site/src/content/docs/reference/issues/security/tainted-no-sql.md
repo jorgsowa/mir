@@ -9,7 +9,7 @@ sidebar:
 
 Reported for:
 
-- a tainted value under a `'$where'` key, which MongoDB runs as JavaScript;
+- a tainted value under a `'$where'` key of a query filter, also nested under `$or` or `$and` or in a filter built in a variable first, which MongoDB runs as JavaScript;
 - a request value that may be an array in the filter passed to a `MongoDB\Collection` query or write method (`find()`, `findOne()`, `updateOne()`, `deleteMany()`, `countDocuments()` and so on) or to `new MongoDB\Driver\Query()`. PHP turns `?user[$ne]=x` into `['$ne' => 'x']`, so the filter `['user' => $_GET['user']]` becomes an operator query that matches every document. Taint on strings alone can't catch this; casting to `(string)` fixes it;
 - `@taint-sink nosql` parameters.
 

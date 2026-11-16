@@ -1128,33 +1128,30 @@ fn first_char_subject<'e>(subject: &'e Expr, literal: &Expr) -> Option<&'e str> 
 // NoSQL
 // ---------------------------------------------------------------------------
 
-/// Report a tainted MongoDB `$where` clause, which runs as JavaScript on the server.
-pub fn check_mongo_where(
-    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
-    elements: &[php_ast::owned::ArrayElement],
-    ctx: &FlowState,
-) {
+/// The `$where` clauses of a filter array literal, also inside `$and`, `$or` and nested arrays.
+fn where_clauses<'e>(filter: &'e Expr, out: &mut Vec<&'e Expr>) {
+    let ExprKind::Array(elements) = &unwrap_parens(filter).kind else {
+        return;
+    };
     for element in elements {
-        let is_where = matches!(
-            element.key.as_ref().map(|k| &k.kind),
-            Some(ExprKind::String(k)) if k.as_str() == "$where"
-        );
-        let value = element.value();
-        let issue = mir_issues::IssueKind::TaintedNoSql;
-        if is_where
-            && reaches_sink(
-                value,
-                Taint::OTHER,
-                &issue,
-                ctx,
-                ea.db,
-                &ea.file,
-                ea.taint_summary,
-            )
-        {
-            ea.emit_taint(issue, value.span, value, Taint::OTHER, ctx);
+        match element.key.as_ref().map(|k| &k.kind) {
+            Some(ExprKind::String(k)) if k.as_str() == "$where" => out.push(element.value()),
+            _ => where_clauses(element.value(), out),
         }
     }
+}
+
+/// An array literal with a `$where` clause that isn't a literal string, to follow into the
+/// variable it's assigned to.
+pub fn has_dynamic_where_clause(value: &Expr) -> bool {
+    let mut clauses = Vec::new();
+    where_clauses(value, &mut clauses);
+    clauses.iter().any(|c| {
+        !matches!(
+            unwrap_parens(c).kind,
+            ExprKind::String(_) | ExprKind::Nowdoc(_)
+        )
+    })
 }
 
 /// The filter a `MongoDB\Collection` query or write method takes.
@@ -1188,10 +1185,37 @@ pub fn check_mongo_filter(
     ctx: &FlowState,
     span: php_ast::Span,
 ) {
+    let issue = mir_issues::IssueKind::TaintedNoSql;
+    let mut clauses = Vec::new();
+    where_clauses(filter, &mut clauses);
+    if let ExprKind::Variable(name) = &unwrap_parens(filter).kind {
+        if ctx.has_value_origin(name, crate::flow_state::ValueOrigin::NoSqlWhere) {
+            clauses.push(filter);
+        }
+    }
+    for clause in clauses {
+        if reaches_sink(
+            clause,
+            Taint::OTHER,
+            &issue,
+            ctx,
+            ea.db,
+            &ea.file,
+            ea.taint_summary,
+        ) {
+            ea.emit_taint(issue.clone(), clause.span, clause, Taint::OTHER, ctx);
+        }
+    }
     let ExprKind::Array(elements) = &unwrap_parens(filter).kind else {
         return;
     };
     for element in elements {
+        if matches!(
+            element.key.as_ref().map(|k| &k.kind),
+            Some(ExprKind::String(k)) if k.as_str() == "$where"
+        ) {
+            continue;
+        }
         let value = unwrap_parens(element.value());
         let may_be_array = match &value.kind {
             ExprKind::ArrayAccess(_) => crate::security::is_request_input(value, ctx),
@@ -1207,7 +1231,6 @@ pub fn check_mongo_filter(
                 .concrete()
                 .is_empty()
         {
-            let issue = mir_issues::IssueKind::TaintedNoSql;
             ea.emit_taint(issue, span, value, Taint::OTHER, ctx);
             return;
         }

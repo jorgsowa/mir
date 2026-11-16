@@ -120,6 +120,8 @@ pub enum ValueOrigin {
     VerifyResult,
     /// An `openssl_pkcs7_verify()` or `ldap_compare()` result: true, false, or -1 on error.
     VerifyResultBool,
+    /// A MongoDB filter array with a `$where` clause that isn't a literal.
+    NoSqlWhere,
 }
 
 impl ValueOrigin {

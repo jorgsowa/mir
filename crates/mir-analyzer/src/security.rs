@@ -306,6 +306,9 @@ pub(crate) fn assigned_origins(value: &Expr, ctx: &FlowState) -> OriginSet {
     if let Some(origin) = crate::taint::assigned_value_origin(value) {
         origins = origins.with(origin);
     }
+    if crate::taint::has_dynamic_where_clause(value) {
+        origins = origins.with(ValueOrigin::NoSqlWhere);
+    }
     if let ExprKind::FunctionCall(fc) = &value.kind {
         match verifier_success(&fc.name) {
             Some("1") => origins = origins.with(ValueOrigin::VerifyResult),

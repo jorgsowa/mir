@@ -788,12 +788,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Parenthesized(inner) => self.analyze(inner, ctx),
 
             // --- Array literals ---------------------------------------------
-            ExprKind::Array(elements) => {
-                if self.db.taint_analysis() {
-                    crate::taint::check_mongo_where(self, elements, ctx);
-                }
-                self.analyze_array(elements, ctx)
-            }
+            ExprKind::Array(elements) => self.analyze_array(elements, ctx),
 
             // --- Array access -----------------------------------------------
             ExprKind::ArrayAccess(aa) => self.analyze_array_access(aa, expr, ctx),
