@@ -2354,6 +2354,7 @@ impl<'a> DefinitionCollector<'a> {
                     assertions: vec![],
                     throws: vec![],
                     throws_void: false,
+                    immediately_invoked_params: vec![],
                     deprecated: None,
                     is_internal: false,
                     internal_scope: None,
@@ -3258,6 +3259,11 @@ impl<'a> DefinitionCollector<'a> {
             assertions,
             throws,
             throws_void: doc.throws_void(),
+            immediately_invoked_params: doc
+                .immediately_invoked_params
+                .iter()
+                .map(|n| Arc::from(n.as_str()))
+                .collect(),
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 if m.attributes
                     .iter()

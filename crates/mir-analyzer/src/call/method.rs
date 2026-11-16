@@ -135,6 +135,7 @@ pub(crate) struct ResolvedMethod {
     /// Native hint bounding an unbound class template in `return_ty_raw`.
     pub(crate) native_return: Option<Type>,
     pub(crate) throws: Arc<[Arc<str>]>,
+    pub(crate) immediately_invoked_params: Vec<Arc<str>>,
     pub(crate) no_named_arguments: bool,
     pub(crate) no_discard: Option<Arc<str>>,
     pub(crate) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
@@ -526,6 +527,7 @@ pub(crate) fn resolve_method_from_db(
                 None
             },
             throws,
+            immediately_invoked_params: storage.immediately_invoked_params.clone(),
             no_named_arguments: storage.no_named_arguments,
             no_discard: storage.no_discard.clone(),
             taint_sink_params: storage.taint_sink_params.clone(),
@@ -1941,6 +1943,14 @@ fn resolve_method_return<'a>(
         if !guarded_by_reflection_throws_guard {
             super::check_callee_throws(ea, ctx, &resolved.throws, span, false);
         }
+        super::check_immediately_invoked_closure_throws(
+            ea,
+            ctx,
+            &resolved.params,
+            &resolved.immediately_invoked_params,
+            &call.args,
+            span,
+        );
 
         // Write @param-out types back to caller variables for by-ref params.
         // Substitute the full `bindings` map — the receiver's own bound class

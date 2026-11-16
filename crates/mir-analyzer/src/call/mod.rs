@@ -61,6 +61,142 @@ pub(crate) fn check_callee_throws(
     }
 }
 
+/// Treats exceptions thrown by closures passed to `@param-immediately-invoked-callable`
+/// parameters as thrown by the call itself.
+pub(crate) fn check_immediately_invoked_closure_throws(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    ctx: &crate::flow_state::FlowState,
+    params: &[mir_codebase::definitions::DeclaredParam],
+    immediately_invoked: &[std::sync::Arc<str>],
+    args: &[php_ast::owned::Arg],
+    span: php_ast::Span,
+) {
+    if immediately_invoked.is_empty() || !ctx.in_function_like {
+        return;
+    }
+    for (i, arg) in args.iter().enumerate() {
+        if arg.unpack() {
+            break;
+        }
+        let param = match &arg.name {
+            Some(n) => {
+                let name = crate::parser::name_to_string_owned(n);
+                params.iter().find(|p| p.name.as_ref() == name)
+            }
+            None => params.get(i),
+        };
+        let Some(param) = param else { continue };
+        if !immediately_invoked
+            .iter()
+            .any(|n| n.as_ref() == param.name.as_ref())
+        {
+            continue;
+        }
+        let Some(value) = arg.value() else { continue };
+        let thrown = closure_thrown_classes(ea.db, &ea.file, value);
+        check_callee_throws(ea, ctx, &thrown, span, false);
+    }
+}
+
+/// Classes a closure literal visibly throws (`throw new X`) outside a `try` that catches them.
+fn closure_thrown_classes(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    expr: &php_ast::owned::Expr,
+) -> Vec<std::sync::Arc<str>> {
+    use crate::ast_ext::NameResolveExt as _;
+    use php_ast::owned::visitor::OwnedVisitor;
+    use php_ast::owned::{Expr, ExprKind, Stmt, StmtKind};
+    use std::ops::ControlFlow;
+
+    struct ThrowScan<'a> {
+        db: &'a dyn crate::db::MirDatabase,
+        file: &'a str,
+        caught: Vec<String>,
+        thrown: Vec<std::sync::Arc<str>>,
+    }
+    impl ThrowScan<'_> {
+        fn record(&mut self, thrown: &Expr) {
+            let ExprKind::New(new) = &thrown.kind else {
+                return;
+            };
+            let Some(class) = new.class.kind.resolve_name_ref(self.db, self.file) else {
+                return;
+            };
+            if !crate::db::class_exists(self.db, &class)
+                || self.caught.iter().any(|c| {
+                    c.eq_ignore_ascii_case(&class)
+                        || crate::db::extends_or_implements(self.db, &class, c)
+                })
+                || self.thrown.iter().any(|t| t.as_ref() == class)
+            {
+                return;
+            }
+            self.thrown.push(std::sync::Arc::from(class.as_str()));
+        }
+    }
+    impl OwnedVisitor for ThrowScan<'_> {
+        type Break = ();
+        fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
+            match &stmt.kind {
+                StmtKind::Function(_)
+                | StmtKind::Class(_)
+                | StmtKind::Interface(_)
+                | StmtKind::Trait(_)
+                | StmtKind::Enum(_) => return ControlFlow::Continue(()),
+                StmtKind::Throw(e) => self.record(e),
+                StmtKind::TryCatch(tc) => {
+                    let outer = self.caught.len();
+                    for catch in tc.catches.iter() {
+                        for ty in catch.types.iter() {
+                            self.caught
+                                .push(crate::ast_ext::resolve_ast_name(ty, self.db, self.file));
+                        }
+                    }
+                    crate::recursion::walk_block(self, &tc.body)?;
+                    self.caught.truncate(outer);
+                    for catch in tc.catches.iter() {
+                        crate::recursion::walk_block(self, &catch.body)?;
+                    }
+                    if let Some(finally) = &tc.finally {
+                        crate::recursion::walk_block(self, finally)?;
+                    }
+                    return ControlFlow::Continue(());
+                }
+                _ => {}
+            }
+            crate::recursion::walk_stmt(self, stmt)
+        }
+        fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
+            match &expr.kind {
+                ExprKind::Closure(_) | ExprKind::ArrowFunction(_) | ExprKind::AnonymousClass(_) => {
+                    return ControlFlow::Continue(())
+                }
+                ExprKind::Throw(e) => self.record(e),
+                _ => {}
+            }
+            crate::recursion::walk_expr(self, expr)
+        }
+    }
+
+    let mut scan = ThrowScan {
+        db,
+        file,
+        caught: Vec::new(),
+        thrown: Vec::new(),
+    };
+    match &expr.kind {
+        ExprKind::Closure(c) => {
+            let _ = crate::recursion::walk_block(&mut scan, &c.body);
+        }
+        ExprKind::ArrowFunction(f) => {
+            let _ = scan.visit_expr(&f.body);
+        }
+        _ => {}
+    }
+    scan.thrown
+}
+
 /// Whether an argument of type `ty` holds an object a callee could mutate.
 pub(crate) fn arg_object_is_mutable(db: &dyn crate::db::MirDatabase, ty: &mir_types::Type) -> bool {
     ty.types.iter().any(|atom| match atom {

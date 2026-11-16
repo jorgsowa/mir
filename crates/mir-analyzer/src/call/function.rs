@@ -36,6 +36,7 @@ struct ResolvedFn {
     assertions: Vec<Assertion>,
     return_ty_raw: Type,
     throws: Arc<[Arc<str>]>,
+    immediately_invoked_params: Vec<Arc<str>>,
     no_named_arguments: bool,
     no_discard: Option<Arc<str>>,
     is_pure: bool,
@@ -125,6 +126,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             assertions: f.assertions.clone(),
             return_ty_raw,
             throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
+            immediately_invoked_params: f.immediately_invoked_params.clone(),
             no_named_arguments: f.no_named_arguments,
             no_discard: f.no_discard.clone(),
             is_pure: f.is_pure,
@@ -1804,6 +1806,14 @@ impl CallAnalyzer {
             // Unchecked exceptions (RuntimeException / LogicException descendants) are skipped by
             // PHP convention — see [`is_unchecked_exception`].
             super::check_callee_throws(ea, ctx, &resolved.throws, span, false);
+            super::check_immediately_invoked_closure_throws(
+                ea,
+                ctx,
+                &params,
+                &resolved.immediately_invoked_params,
+                &call.args,
+                span,
+            );
 
             ea.record_symbol(
                 call.name.span,

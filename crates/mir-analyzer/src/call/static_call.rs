@@ -812,6 +812,14 @@ impl CallAnalyzer {
                 );
             }
             super::check_callee_throws(ea, ctx, &resolved.throws, span, true);
+            super::check_immediately_invoked_closure_throws(
+                ea,
+                ctx,
+                &resolved.params,
+                &resolved.immediately_invoked_params,
+                &call.args,
+                span,
+            );
             if resolved.is_internal || resolved.internal_scope.is_some() {
                 let calling_ns = ea.db.file_namespace(&ea.file);
                 let outside = match resolved.internal_scope.as_deref() {

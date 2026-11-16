@@ -552,6 +552,16 @@ impl DocblockParser {
                     });
                 }
                 "pure" | "psalm-pure" | "phpstan-pure" => result.is_pure = true,
+                "param-immediately-invoked-callable" => {
+                    if let Some(name) = body_text(tag.body.as_ref()).and_then(|b| {
+                        b.split_whitespace()
+                            .next()?
+                            .strip_prefix('$')
+                            .map(str::to_string)
+                    }) {
+                        result.immediately_invoked_params.push(name);
+                    }
+                }
                 "pure-unless-callable-is-impure" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         result.pure_unless_callable_impure.extend(
@@ -1003,6 +1013,8 @@ pub struct ParsedDocblock {
     pub is_pure: bool,
     /// `@pure-unless-callable-is-impure $f`: parameter names, without `$`.
     pub pure_unless_callable_impure: Vec<String>,
+    /// `@param-immediately-invoked-callable $f`: parameter names, without `$`.
+    pub immediately_invoked_params: Vec<String>,
     /// `@phpstan-all-methods-pure` on a class.
     pub all_methods_pure: bool,
     /// `@psalm-allow-private-mutation`: a `@readonly` property stays writable inside its class.

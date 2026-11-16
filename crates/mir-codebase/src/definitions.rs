@@ -533,6 +533,9 @@ pub struct MethodDef {
     /// `@throws void`: the body must not let any exception escape.
     #[serde(default)]
     pub throws_void: bool,
+    /// `@param-immediately-invoked-callable $p`: parameter names, without `$`.
+    #[serde(default)]
+    pub immediately_invoked_params: Vec<Arc<str>>,
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     /// `@psalm-internal Ns`: callers must be in `Ns` or below it.
@@ -1039,6 +1042,9 @@ pub struct FunctionDef {
     /// `@throws void`: the body must not let any exception escape.
     #[serde(default)]
     pub throws_void: bool,
+    /// `@param-immediately-invoked-callable $p`: parameter names, without `$`.
+    #[serde(default)]
+    pub immediately_invoked_params: Vec<Arc<str>>,
     pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
     /// `@pure-unless-callable-is-impure`: pure when the callables passed to these parameters are.
