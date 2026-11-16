@@ -2129,6 +2129,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                             }
+                            let readonly_default_initializes = prop_def.as_ref().is_some_and(|p| {
+                                p.has_native_readonly
+                                    && p.default.is_some()
+                                    && crate::db::db_php_version(self.db)
+                                        >= crate::php_version::PhpVersion::new(8, 6)
+                            });
                             let prop_info: Option<(bool, Option<Type>, bool, bool)> =
                                 prop_def.map(|p| {
                                     (
@@ -2189,7 +2195,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     // property ... once initialized") — only the FIRST
                                     // write in that scope is legal.
                                     if let ExprKind::Variable(obj_var) = &pa.object.kind {
-                                        if ctx.is_readonly_initialized(obj_var.as_ref(), &prop_name)
+                                        // From 8.6 a default initializes the property; only
+                                        // `__clone` may reinitialize it.
+                                        let initialized_by_default = readonly_default_initializes
+                                            && obj_var.as_ref() == "this"
+                                            && ctx.current_method_name.as_deref().is_some_and(
+                                                |m| !m.eq_ignore_ascii_case("__clone"),
+                                            );
+                                        if initialized_by_default
+                                            || ctx.is_readonly_initialized(
+                                                obj_var.as_ref(),
+                                                &prop_name,
+                                            )
                                         {
                                             self.emit(
                                                 IssueKind::ReadonlyPropertyAlreadyInitialized {

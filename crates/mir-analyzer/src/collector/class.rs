@@ -1,6 +1,7 @@
 use super::DefinitionCollector;
 use crate::collector::literal_types;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
+use crate::php_version::PhpVersion;
 use mir_codebase::definitions::{
     ConstantDef, DeclaredParam, MethodDef, PropertyDef, TemplateParam,
 };
@@ -395,14 +396,17 @@ impl<'a> DefinitionCollector<'a> {
                         from_docblock: false,
                         write_only: prop_doc.is_write_only,
                     };
-                    // A native `readonly` property (own keyword or whole-class
+                    // Before 8.6 a native `readonly` property (own keyword or whole-class
                     // `readonly class`) may not carry a default value — a PHP
                     // fatal. (The untyped-readonly-property fatal is already
                     // caught by the parser itself as a `CompileError`, so it's
                     // not duplicated here.) A docblock-only `@readonly` tag is
                     // advisory, not native syntax, so it's excluded.
                     let has_native_readonly = p.modifiers.is_readonly || decl.modifiers.is_readonly;
-                    if has_native_readonly && p.default.is_some() {
+                    if has_native_readonly
+                        && p.default.is_some()
+                        && self.targets_before(PhpVersion::new(8, 6))
+                    {
                         self.issues.add(mir_issues::Issue::new(
                             mir_issues::IssueKind::InvalidReadonlyPropertyDeclaration {
                                 class: fqcn.to_string(),

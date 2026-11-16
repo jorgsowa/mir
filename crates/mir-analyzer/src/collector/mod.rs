@@ -1088,6 +1088,8 @@ pub struct DefinitionCollector<'a> {
     /// When `Some`, stub symbols annotated with `@since`/`@removed` are filtered
     /// against this target version. `None` disables filtering (user code).
     php_version: Option<PhpVersion>,
+    /// The PHP version user code is analyzed for; `None` checks every version's rules.
+    target_version: Option<PhpVersion>,
     /// The first namespace declaration seen in this file. Matches the semantics
     /// of `project.rs` which only records the first namespace per file.
     first_namespace: Option<String>,
@@ -1156,6 +1158,7 @@ impl<'a> DefinitionCollector<'a> {
             use_aliases: FxHashMap::default(),
             issues: IssueBuffer::new(),
             php_version: None,
+            target_version: None,
             first_namespace: None,
             accumulated_imports: ImportMaps::default(),
             ns_blocks: Vec::new(),
@@ -1170,7 +1173,19 @@ impl<'a> DefinitionCollector<'a> {
     /// removed at or before, the target version are not registered.
     pub fn with_php_version(mut self, version: PhpVersion) -> Self {
         self.php_version = Some(version);
+        self.target_version = Some(version);
         self
+    }
+
+    /// Check version-dependent language rules against `version` without filtering symbols.
+    pub fn with_target_version(mut self, version: PhpVersion) -> Self {
+        self.target_version = Some(version);
+        self
+    }
+
+    /// Whether the target version is below `version`; `true` when no target is set.
+    fn targets_before(&self, version: PhpVersion) -> bool {
+        self.target_version.is_none_or(|v| v < version)
     }
 
     /// Returns `true` if a docblock's `@since`/`@removed` tags allow this

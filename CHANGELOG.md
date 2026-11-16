@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- From PHP 8.6 a readonly property may declare a default value, so it is no longer reported as InvalidReadonlyPropertyDeclaration; assigning such a property outside `__clone()` is ReadonlyPropertyAlreadyInitialized.
 - `@use Trait<Args>` written on a trait `use` statement binds the trait's templates.
 - `@psalm-import-type` / `@phpstan-import-type X from C as Alias` binds the imported type under `Alias`.
 - A backslash-qualified docblock type keyword (`\int`, `\string`, …) is accepted as the keyword without an `InvalidDocblockType` warning.

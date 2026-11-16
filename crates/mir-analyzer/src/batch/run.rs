@@ -129,7 +129,8 @@ impl AnalysisSession {
                     parsed.file.clone(),
                     parsed.source(),
                     parsed.source_map(),
-                );
+                )
+                .with_target_version(php_version);
                 let (mut slice, collector_issues) = collector.collect_slice(parsed.owned());
                 all_issues.extend(collector_issues);
                 mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);

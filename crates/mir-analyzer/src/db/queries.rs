@@ -952,7 +952,7 @@ pub fn collect_file_definitions_uncached(
     let collector = if crate::stubs::is_stub_path(path) || db.is_user_stub_source_file(file) {
         collector.with_php_version(php_version)
     } else {
-        collector
+        collector.with_target_version(php_version)
     };
     let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
     all_issues.extend(collector_issues);

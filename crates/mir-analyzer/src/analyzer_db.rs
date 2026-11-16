@@ -280,7 +280,7 @@ impl AnalyzerDb {
         let collector = if db_snapshot.collects_for_php_version(&file) {
             collector.with_php_version(php_version)
         } else {
-            collector
+            collector.with_target_version(php_version)
         };
         let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
         all_issues.extend(collector_issues);
