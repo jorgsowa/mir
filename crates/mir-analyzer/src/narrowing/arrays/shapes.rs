@@ -1002,6 +1002,8 @@ pub(crate) fn narrow_array_emptiness_condition(
             } else {
                 narrow_offset_empty_collection_by_path(left, ctx, db, file, effective_true);
             }
+        } else if !effective_true {
+            narrow_single_key_literal_mismatch(ctx, left, elems);
         }
         true
     } else if let ExprKind::Array(elems) = &left.kind {
@@ -1024,10 +1026,92 @@ pub(crate) fn narrow_array_emptiness_condition(
             } else {
                 narrow_offset_empty_collection_by_path(right, ctx, db, file, effective_true);
             }
+        } else if !effective_true {
+            narrow_single_key_literal_mismatch(ctx, right, elems);
         }
         true
     } else {
         false
+    }
+}
+
+/// `$arr !== [K => LIT]`: a sealed single-key shape at key `K` can't hold `LIT` there.
+/// Multi-key literals prove nothing per key, so only one-element literals narrow.
+fn narrow_single_key_literal_mismatch(
+    ctx: &mut FlowState,
+    subject: &php_ast::owned::Expr,
+    elems: &[php_ast::owned::ArrayElement],
+) {
+    use mir_types::atomic::ArrayKey;
+    let [elem] = elems else {
+        return;
+    };
+    if !matches!(elem.kind, php_ast::owned::ArrayElementKind::Value(_)) {
+        return;
+    }
+    let key = match elem.key.as_ref().map(|k| &k.kind) {
+        None => ArrayKey::Int(0),
+        Some(ExprKind::Int(n)) => ArrayKey::Int(*n),
+        // Numeric-looking string keys are cast to int by PHP.
+        Some(ExprKind::String(s)) => {
+            let text = s.to_text();
+            if text.is_empty() || text.bytes().any(|b| b.is_ascii_digit()) {
+                return;
+            }
+            ArrayKey::String(std::sync::Arc::from(&*text))
+        }
+        _ => return,
+    };
+    let subtract = |ty: &Type| -> Type {
+        match &elem.value().kind {
+            ExprKind::Null => ty.remove_null(),
+            ExprKind::Bool(b) => super::super::literals::bool_narrow_type(ty, *b, false),
+            ExprKind::Int(n) => super::super::literals::literal_int_narrow_type(ty, *n, false),
+            ExprKind::String(s) => {
+                super::super::literals::literal_string_narrow_type(ty, &s.to_text(), false)
+            }
+            _ => ty.clone(),
+        }
+    };
+    let Some(var_name) = extract_var_name(subject) else {
+        return;
+    };
+    let current = ctx.get_var(var_name);
+    let mut changed = false;
+    let mut narrowed = Type::empty();
+    narrowed.from_docblock = current.from_docblock;
+    for atomic in &current.types {
+        if let Atomic::TKeyedArray {
+            properties,
+            is_open: false,
+            is_list,
+        } = atomic
+        {
+            if let (1, Some(prop)) = (properties.len(), properties.get(&key)) {
+                let value_ty = subtract(&prop.ty);
+                if !prop.optional && !value_ty.is_empty() && value_ty != prop.ty {
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
+                    new_props.insert(
+                        key.clone(),
+                        mir_types::atomic::KeyedProperty {
+                            ty: value_ty,
+                            optional: false,
+                        },
+                    );
+                    narrowed.add_type(Atomic::TKeyedArray {
+                        properties: std::sync::Arc::new(new_props),
+                        is_open: false,
+                        is_list: *is_list,
+                    });
+                    changed = true;
+                    continue;
+                }
+            }
+        }
+        narrowed.add_type(atomic.clone());
+    }
+    if changed {
+        ctx.set_var(var_name, narrowed);
     }
 }
 
