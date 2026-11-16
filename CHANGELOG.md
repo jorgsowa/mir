@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `@psalm-import-type` / `@phpstan-import-type X from C as Alias` binds the imported type under `Alias`.
 - A backslash-qualified docblock type keyword (`\int`, `\string`, …) is accepted as the keyword without an `InvalidDocblockType` warning.
 - A composer.json without an `autoload` section no longer exits with code 2; mir analyzes the paths as it does without Composer.
 - `$arr !== [LITERAL]` removes that literal from the value of a sealed single-key shape, so `if ($arr === [null]) { return; }` leaves `array{0: string}`.

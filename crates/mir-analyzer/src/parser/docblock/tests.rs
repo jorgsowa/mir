@@ -409,6 +409,16 @@ fn parse_import_type_with_as() {
 }
 
 #[test]
+fn parse_import_type_with_as_after_from() {
+    let doc = "/** @phpstan-import-type UserId from UserRepository as LocalId */";
+    let parsed = DocblockParser::parse(doc);
+    assert_eq!(parsed.import_types.len(), 1);
+    assert_eq!(parsed.import_types[0].original, "UserId");
+    assert_eq!(parsed.import_types[0].local, "LocalId");
+    assert_eq!(parsed.import_types[0].from_class, "UserRepository");
+}
+
+#[test]
 fn parse_require_extends() {
     let doc = "/** @psalm-require-extends Model */";
     let parsed = DocblockParser::parse(doc);

@@ -1685,9 +1685,10 @@ pub(super) fn parse_import_type(body: &str) -> Option<DocImportType> {
     let tokens: Vec<&str> = body.split_whitespace().collect();
     let from = tokens.iter().position(|t| *t == "from")?;
     let from_class = tokens.get(from + 1)?.to_string();
-    let (original, local) = match tokens[..from] {
-        [name] => (name, name),
-        [original, "as", local] => (original, local),
+    let (original, local) = match (&tokens[..from], tokens.get(from + 2..from + 4)) {
+        ([name], Some(["as", local])) => (*name, *local),
+        ([name], _) => (*name, *name),
+        ([original, "as", local], _) => (*original, *local),
         _ => return None,
     };
     Some(DocImportType {
