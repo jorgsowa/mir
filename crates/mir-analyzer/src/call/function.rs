@@ -1308,8 +1308,11 @@ impl CallAnalyzer {
                     Some([Atomic::TNamedObject { fqcn, .. }]) => {
                         Type::single(Atomic::TClassString(Some(*fqcn)))
                     }
-                    _ => return_ty,
+                    _ => Type::single(Atomic::TClassString(None)),
                 },
+                "get_parent_class" => {
+                    Type::from_vec(vec![Atomic::TClassString(None), Atomic::TFalse])
+                }
                 "strtolower" | "mb_strtolower" | "strtoupper" | "mb_strtoupper" => {
                     super::callable::case_conversion_return_type(
                         fn_name.ends_with("lower"),

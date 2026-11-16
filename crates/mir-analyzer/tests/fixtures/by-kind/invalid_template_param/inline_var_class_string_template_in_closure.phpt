@@ -29,6 +29,7 @@ class Builder {
     /** @template T of Named */
     public static function arrow(Registry $r): callable {
         return fn(string $name): ?Named => $r->get($name);
+//                                                 ^^^^^ ArgumentTypeCoercion: Argument $name of get() expects 'class-string<T>', got 'string' — coercion may fail at runtime
     }
 
     /** @template T of Named */

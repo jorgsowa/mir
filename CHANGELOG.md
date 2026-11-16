@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A plain `string` passed to a `class-string`, `interface-string`, `enum-string` or `trait-string` parameter is reported as ArgumentTypeCoercion, and `get_class()` / `get_parent_class()` return `class-string`.
 - `AnalysisSnapshot::indexed_references_to` and `indexed_use_import_locations` take an `&IndexCancel`. Cancelling it stops the query inside a file's analysis, at the next loop-body pass, with `Err(Cancelled::Local)` and nothing memoized. `warm_files` and `reanalyze_files` now honor their token the same way.
 - Performance: a loop nested inside another loop starts from its previous fixed point on each outer pass instead of converging from scratch (ten nested `for` loops: 2.3 s → 0.3 s).
 - Performance: with taint analysis on, the include graph that global-variable taint reads is built in parallel before body analysis when an analyzed file has a `global` statement or reads `$GLOBALS`, instead of serially on first use while other workers wait (WordPress at `-j 8` without cache: about 5% faster wall time, same instructions).

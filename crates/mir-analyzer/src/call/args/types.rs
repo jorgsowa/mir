@@ -927,7 +927,15 @@ pub(crate) fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
             let single = Type::single(a.clone());
             single.is_subtype_structural(param)
                 || param.types.iter().any(|p| {
-                    (refinable(p) || matches!(p, Atomic::TLiteralString(_)))
+                    (refinable(p)
+                        || matches!(
+                            p,
+                            Atomic::TLiteralString(_)
+                                | Atomic::TClassString(_)
+                                | Atomic::TInterfaceString(_)
+                                | Atomic::TEnumString
+                                | Atomic::TTraitString
+                        ))
                         && Type::single(p.clone()).is_subtype_structural(&single)
                         // The two overlap: every numeric string but "0" is non-falsy.
                         || matches!(
