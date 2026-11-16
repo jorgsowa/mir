@@ -31,6 +31,9 @@ pub fn run_composer_flow(
         extensions.clone(),
     ) {
         Ok(m) => m,
+        Err(mir_analyzer::composer::ComposerError::MissingAutoload) => {
+            return run_plain_flow(cli, config, config_base);
+        }
         Err(e) => {
             eprintln!("mir: composer error: {e}");
             process::exit(2);

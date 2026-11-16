@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A composer.json without an `autoload` section no longer exits with code 2; mir analyzes the paths as it does without Composer.
 - `$arr !== [LITERAL]` removes that literal from the value of a sealed single-key shape, so `if ($arr === [null]) { return; }` leaves `array{0: string}`.
 - A class whose traits declare the same property incompatibly no longer also reports MissingConstructor.
 - Report a resource closed by `fclose()`/`pclose()`/`closedir()` passed to an `open-resource` parameter as InvalidArgument.

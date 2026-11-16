@@ -4,6 +4,7 @@ mod baseline_cli_errors;
 mod baseline_psalm_aliases;
 mod color_output;
 mod composer_class_loader;
+mod composer_without_autoload;
 mod config_outside_project_root;
 mod default_baseline_file;
 mod effective_severity;
