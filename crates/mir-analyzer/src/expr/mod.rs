@@ -102,6 +102,9 @@ pub struct ExpressionAnalyzer<'a> {
     vivifying_reference: bool,
     /// Param types the callee passes to the closure literal about to be analyzed.
     pub(crate) callback_param_hints: Option<Vec<Option<Type>>>,
+    /// The password argument of the `password_hash()` call being analyzed, where a fast
+    /// digest is a pre-hash, not the stored hash.
+    pub(crate) password_prehash: Option<php_ast::Span>,
     /// When true, the variable currently being analyzed is the BASE of an
     /// `ArrayAccess` expression (`$_SERVER` inside `$_SERVER['x']`), which
     /// already runs its own superglobal purity check at the `ArrayAccess`
@@ -416,6 +419,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             in_existence_check: false,
             vivifying_reference: false,
             callback_param_hints: None,
+            password_prehash: None,
             in_array_access_base: false,
             discarded_call: None,
             yielded_types,

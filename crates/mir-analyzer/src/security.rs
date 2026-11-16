@@ -145,6 +145,19 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if matches!(fn_name_lower, "password_hash" | "password_verify") {
+        ea.password_prehash = arg(args, 0, "password").map(|p| p.span);
+    }
+    let in_prehash = ea
+        .password_prehash
+        .is_some_and(|p| p.start <= span.start && span.end <= p.end);
+    if let Some(reason) = fast_password_digest(fn_name_lower, args, in_prehash) {
+        ea.emit(
+            mir_issues::IssueKind::InsecurePasswordHash { reason },
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(reason) = insecure_session_setting(fn_name_lower, args, ctx) {
         ea.emit(
             mir_issues::IssueKind::InsecureSessionConfig { reason },
@@ -164,6 +177,52 @@ pub(crate) fn check_builtin_call(
 // ---------------------------------------------------------------------------
 // Password hashing
 // ---------------------------------------------------------------------------
+
+/// `md5($password)`, `sha1($_POST['pass'])`, `hash('sha256', $pwd)`: a fast digest of a password,
+/// which a GPU guesses billions of times a second once the hash leaks.
+fn fast_password_digest(fn_name_lower: &str, args: &[Arg], prehash: bool) -> Option<String> {
+    let (data, binary) = match fn_name_lower {
+        "md5" | "sha1" => (arg(args, 0, "string"), arg(args, 1, "binary")),
+        "crc32" => (arg(args, 0, "string"), None),
+        "hash" => (arg(args, 1, "data"), arg(args, 2, "binary")),
+        _ => (None, None),
+    };
+    let data = data?;
+    // A raw binary digest is a pre-hash for `password_hash()`; nobody stores raw bytes.
+    let raw = matches!(binary.map(|b| &b.kind), Some(ExprKind::Bool(true)));
+    if prehash || raw || !names_password(data) {
+        return None;
+    }
+    Some(format!(
+        "{fn_name_lower}() is a fast hash, so a leaked password hash is guessed quickly; use password_hash()"
+    ))
+}
+
+/// A variable, property or array key whose name says it holds a password; a password mixed into
+/// other text is a signature or key derivation, not a stored hash.
+fn names_password(expr: &Expr) -> bool {
+    let name = match &expr.kind {
+        ExprKind::Variable(v) => v.trim_start_matches('$'),
+        ExprKind::ArrayAccess(aa) => match literal_str(aa.index.as_ref()) {
+            Some(key) => key,
+            None => return false,
+        },
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            match &pa.property.kind {
+                ExprKind::Identifier(name) => name.as_ref(),
+                _ => return false,
+            }
+        }
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => return names_password(inner),
+        _ => return false,
+    };
+    identifier_words(name).iter().any(|w| {
+        matches!(
+            w.as_str(),
+            "password" | "passwd" | "pass" | "pwd" | "passphrase"
+        )
+    })
+}
 
 fn password_hash_misuse(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
     if fn_name_lower != "password_hash" {
@@ -470,11 +529,11 @@ pub(crate) fn check_weak_random_return(
     }
 }
 
-/// Whether a function name ends in a word for a secret: `generateToken`, `make_salt`, `newApiKey`.
-fn names_secret(name: &str) -> bool {
+/// The lowercase words of a camelCase or snake_case identifier: `newPassword` → new, password.
+fn identifier_words(name: &str) -> Vec<String> {
     let mut words: Vec<String> = Vec::new();
     for (i, c) in name.char_indices() {
-        if c == '_' {
+        if c == '_' || c == '-' {
             words.push(String::new());
         } else if words.is_empty() || (c.is_ascii_uppercase() && i > 0) {
             words.push(c.to_ascii_lowercase().to_string());
@@ -483,6 +542,12 @@ fn names_secret(name: &str) -> bool {
         }
     }
     words.retain(|w| !w.is_empty());
+    words
+}
+
+/// Whether a function name ends in a word for a secret: `generateToken`, `make_salt`, `newApiKey`.
+fn names_secret(name: &str) -> bool {
+    let words = identifier_words(name);
     let last = words.last().map(String::as_str);
     let last_two =
         (words.len() >= 2).then(|| format!("{}{}", words[words.len() - 2], words[words.len() - 1]));
