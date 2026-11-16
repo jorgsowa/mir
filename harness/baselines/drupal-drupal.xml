@@ -1040,6 +1040,9 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Password/PhpassHashedPasswordBase.php">
+    <InsecurePasswordHash>
+      <code><![CDATA[md5($password)]]></code>
+    </InsecurePasswordHash>
     <InvalidReturnType>
       <code><![CDATA[return FALSE;]]></code>
       <code><![CDATA[return FALSE;]]></code>
