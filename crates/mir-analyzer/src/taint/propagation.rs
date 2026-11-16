@@ -1069,6 +1069,12 @@ pub fn expr_taint(
                     taint |= args_taint(&mc.args, ctx, db, file);
                     continue;
                 }
+                // `withHost($h)` and `resolve($ref)` build a URL from their arguments.
+                if is_uri_class(fqcn.as_ref())
+                    && (method_lower.starts_with("with") || method_lower == "resolve")
+                {
+                    taint |= args_taint(&mc.args, ctx, db, file);
+                }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 if let Some((_, m)) =
                     crate::db::find_method_respecting_precedence(db, here, &method_lower)
