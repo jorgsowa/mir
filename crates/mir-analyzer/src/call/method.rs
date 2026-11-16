@@ -1705,10 +1705,16 @@ fn resolve_method_return<'a>(
         // this receiver), staling any narrowing recorded before the call —
         // e.g. `$this->user = $u; $this->reset(); $this->user->getId();`
         // must not still see `$this->user` as non-null after `reset()`.
+        let memoizable_result = crate::narrowing::call_result_is_memoizable(&resolved, ea.db);
         if !resolved.is_static
             && !resolved.is_pure
             && !resolved.is_mutation_free
             && !resolved.inferred_mutation_free
+            && !crate::db::method_is_immutable_class_member(
+                ea.db,
+                resolved.owner_fqcn.as_ref(),
+                resolved.name.as_ref(),
+            )
         {
             if let ExprKind::Variable(recv_name) = &call.object.kind {
                 let memoized = (call.args.is_empty() && ea.db.memoize_method_call_results())
@@ -2214,11 +2220,7 @@ fn resolve_method_return<'a>(
             ctx.self_fqcn.as_deref(),
             &mut return_ty,
         );
-        if call.args.is_empty()
-            && (resolved.is_pure
-                || resolved.is_mutation_free
-                || ea.db.memoize_method_call_results())
-        {
+        if call.args.is_empty() && memoizable_result {
             if let Some(recv) = crate::narrowing::memoized_receiver_key(&call.object)
                 .filter(|k| crate::narrowing::receiver_key_is_stable(ctx, k, ea.db))
             {

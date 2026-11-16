@@ -420,13 +420,25 @@ fn stable_method_return(
             | Atomic::TConditional { .. } => false,
             _ => true,
         });
-    if resolved.is_static
-        || !(resolved.is_pure || resolved.is_mutation_free || db.memoize_method_call_results())
-        || !receiver_independent
-    {
+    if resolved.is_static || !call_result_is_memoizable(&resolved, db) || !receiver_independent {
         return None;
     }
     Some(resolved.return_ty_raw)
+}
+
+/// Whether repeated zero-arg calls of `resolved` on an unchanged receiver return the same value.
+pub(crate) fn call_result_is_memoizable(
+    resolved: &crate::call::method::ResolvedMethod,
+    db: &dyn MirDatabase,
+) -> bool {
+    resolved.is_pure
+        || resolved.is_mutation_free
+        || db.memoize_method_call_results()
+        || crate::db::method_is_immutable_class_member(
+            db,
+            resolved.owner_fqcn.as_ref(),
+            resolved.name.as_ref(),
+        )
 }
 
 /// Like `extract_prop_access`, but only matches the nullsafe (`?->`) form.

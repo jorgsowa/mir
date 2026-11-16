@@ -183,6 +183,19 @@ pub(crate) fn apply_one_assertion(
                 let Some(obj_key) = receiver.and_then(extract_var_name) else {
                     return false;
                 };
+                // `$this->method()` narrows the zero-arg call result only while repeated calls
+                // are provably equal.
+                let method_key = prop_name
+                    .strip_suffix("()")
+                    .filter(|m| !m.is_empty() && !m.contains(['(', ')', ' ']))
+                    .map(super::core::method_call_key);
+                if let Some(key) = &method_key {
+                    let chain = format!("{obj_key}->{key}");
+                    if !super::core::receiver_key_is_stable(ctx, &chain, db) {
+                        return false;
+                    }
+                }
+                let prop_name = method_key.as_deref().unwrap_or(prop_name);
                 let ty = match template_bindings {
                     Some(b) => assertion.ty.substitute_templates(b),
                     None => assertion.ty.clone(),
