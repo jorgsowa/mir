@@ -13,9 +13,9 @@ $r = (int) str_ireplace(['rgb(', 'rgba('], ['', ''], $parts[0]);
 $g = (int) str_replace(')', '', $parts[2]);
 
 $x = str_replace('a', 'b', 'hello');
-/** @mir-check $x is string */
+/** @mir-check $x is literal-string */
 echo $x;
 
 $y = str_ireplace('a', 'b', 'hello');
-/** @mir-check $y is string */
+/** @mir-check $y is literal-string */
 echo $y;

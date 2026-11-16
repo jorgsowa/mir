@@ -129,6 +129,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         } = lookup_global_constant(self.db, &self.file, name);
 
         if let Some((fqn, ty)) = resolved {
+            let ty = if crate::stubs::is_builtin_constant(&fqn) {
+                builtin_constant_text(ty)
+            } else {
+                ty
+            };
             self.record_global_constant_ref(&fqn, expr.span);
             self.record_symbol(
                 expr.span,
@@ -154,6 +159,27 @@ impl<'a> ExpressionAnalyzer<'a> {
             Type::mixed()
         }
     }
+}
+
+/// A predefined string constant such as `DIRECTORY_SEPARATOR` or `PHP_OS_FAMILY` is fixed by
+/// the platform, never by input, so it counts as literal text.
+fn builtin_constant_text(ty: Type) -> Type {
+    let runtime_string = |a: &mir_types::Atomic| {
+        matches!(
+            a,
+            mir_types::Atomic::TString
+                | mir_types::Atomic::TNonEmptyString
+                | mir_types::Atomic::TNonFalsyString
+        )
+    };
+    if ty.types.is_empty() || !ty.types.iter().all(runtime_string) {
+        return ty;
+    }
+    let non_empty = ty
+        .types
+        .iter()
+        .all(|a| !matches!(a, mir_types::Atomic::TString));
+    crate::expr::helpers::literal_string(non_empty)
 }
 
 struct GlobalConstantLookup {

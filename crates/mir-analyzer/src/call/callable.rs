@@ -455,7 +455,44 @@ pub(crate) fn str_repeat_return_type(arg_types: &[Type]) -> Option<Type> {
     }
 }
 
-/// `implode`, `str_repeat`, `sprintf` and `trim` of literal text return literal text.
+/// Builtins whose result is made only from their string arguments, so literal text in gives
+/// literal text out.
+const STRING_REWRITERS: &[&str] = &[
+    "strtoupper",
+    "strtolower",
+    "ucfirst",
+    "lcfirst",
+    "ucwords",
+    "mb_strtoupper",
+    "mb_strtolower",
+    "mb_convert_case",
+    "substr",
+    "mb_substr",
+    "str_replace",
+    "str_ireplace",
+    "str_pad",
+    "mb_str_pad",
+    "strrev",
+    "strtr",
+    "nl2br",
+    "wordwrap",
+    "chunk_split",
+    "addslashes",
+    "addcslashes",
+    "htmlspecialchars",
+    "htmlentities",
+    "urlencode",
+    "rawurlencode",
+    "base64_encode",
+    "bin2hex",
+];
+
+pub(crate) fn rewrites_string_args(fn_name: &str) -> bool {
+    STRING_REWRITERS.contains(&fn_name)
+}
+
+/// `implode`, `str_repeat`, `sprintf`, `trim` and the [`STRING_REWRITERS`] of literal text
+/// return literal text.
 pub(crate) fn literal_text_return_type(fn_name: &str, arg_types: &[Type], return_ty: Type) -> Type {
     use crate::expr::helpers::is_literal_text;
     let values_literal = |arr: &Type| {
@@ -479,10 +516,39 @@ pub(crate) fn literal_text_return_type(fn_name: &str, arg_types: &[Type], return
         // The count adds no characters of its own.
         ("str_repeat", [input, _]) => is_literal_text(input),
         ("trim" | "ltrim" | "rtrim" | "sprintf", [_, ..]) => arg_types.iter().all(is_literal_text),
+        // Counts, offsets and flags add no characters of their own.
+        (name, [_, ..]) if rewrites_string_args(name) => arg_types.iter().all(|arg| {
+            is_literal_text(arg)
+                || values_literal(arg)
+                || arg.types.iter().all(|a| {
+                    matches!(
+                        a,
+                        Atomic::TInt
+                            | Atomic::TLiteralInt(_)
+                            | Atomic::TIntRange { .. }
+                            | Atomic::TPositiveInt
+                            | Atomic::TBool
+                            | Atomic::TTrue
+                            | Atomic::TFalse
+                            | Atomic::TNull
+                    )
+                })
+        }),
         _ => false,
     };
     let all_strings = !return_ty.types.is_empty() && return_ty.types.iter().all(|a| a.is_string());
-    if !literal_args || !all_strings || is_literal_text(&return_ty) {
+    // `literal-string` can't also say upper- or lowercase, which the result type already says.
+    let case_refined = return_ty.types.iter().any(|a| {
+        matches!(
+            a,
+            Atomic::TRefinedString {
+                refinement: mir_types::StringRefinement::Uppercase
+                    | mir_types::StringRefinement::Lowercase,
+                ..
+            }
+        )
+    });
+    if !literal_args || !all_strings || case_refined || is_literal_text(&return_ty) {
         return return_ty;
     }
     crate::expr::helpers::literal_string(is_non_empty_string(&return_ty))

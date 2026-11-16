@@ -1669,6 +1669,13 @@ impl CallAnalyzer {
             };
 
             let mut return_ty = return_ty;
+            if super::callable::rewrites_string_args(resolved_fn_name.as_str()) {
+                return_ty = super::callable::literal_text_return_type(
+                    resolved_fn_name.as_str(),
+                    &arg_types,
+                    return_ty,
+                );
+            }
             ea.apply_function_call_plugins(
                 resolved.fqn.as_ref(),
                 &call.args,
