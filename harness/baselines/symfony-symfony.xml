@@ -1871,7 +1871,9 @@
       <code><![CDATA[header($header)]]></code>
     </TaintedHeader>
     <CodeAfterRedirect>
-      <code><![CDATA[header('Location: http://localhost:8057/post', true, 307)]]></code>
+      <code><![CDATA[header('Location: http://127.0.0.1:8057/302', true, 301)]]></code>
+      <code><![CDATA[header('Location: http://foo.example.', true, 301)]]></code>
+      <code><![CDATA[header('Location: '.$location, true, 302)]]></code>
     </CodeAfterRedirect>
   </file>
   <file src="src/Symfony/Contracts/HttpClient/Test/HttpClientTestCase.php">
