@@ -428,8 +428,18 @@ pub struct FlowState {
     /// A `header('Location: ...')` call no `exit` has followed on some path to here.
     pub redirect_pending: Option<php_ast::Span>,
 
-    /// A condition has looked at the request's `Origin` header, as an allowlist check would.
+    /// A condition has pinned `$_SERVER['HTTP_ORIGIN']` itself, as an allowlist check would.
     pub origin_checked: bool,
+
+    /// An uploaded file's extension or content has been checked on some path to here.
+    pub upload_checked: bool,
+
+    /// `Access-Control-Allow-Credentials: true` has been sent on some path to here.
+    pub cors_credentials: bool,
+
+    /// An `Access-Control-Allow-Origin` header reflecting the request's Origin, sent before
+    /// any credentials header.
+    pub cors_reflection: Option<php_ast::Span>,
 
     /// `(slot, name)` of each by-ref parameter whose exit taint the summary records.
     pub byref_out_slots: Arc<[(usize, Name)]>,
@@ -930,6 +940,9 @@ impl FlowState {
             ignore_taint_guards: false,
             redirect_pending: None,
             origin_checked: false,
+            upload_checked: false,
+            cors_credentials: false,
+            cors_reflection: None,
             byref_out_slots: Arc::default(),
             param_parts: Arc::default(),
             plain_vars: Arc::default(),
@@ -3218,6 +3231,9 @@ impl FlowState {
         result.non_html_response = if_ctx.non_html_response && else_ctx.non_html_response;
         result.redirect_pending = if_ctx.redirect_pending.or(else_ctx.redirect_pending);
         result.origin_checked = if_ctx.origin_checked || else_ctx.origin_checked;
+        result.upload_checked = if_ctx.upload_checked || else_ctx.upload_checked;
+        result.cors_credentials = if_ctx.cors_credentials || else_ctx.cors_credentials;
+        result.cors_reflection = if_ctx.cors_reflection.or(else_ctx.cors_reflection);
 
         // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
         for name in if_ctx

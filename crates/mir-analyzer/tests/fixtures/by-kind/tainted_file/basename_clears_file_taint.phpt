@@ -15,6 +15,7 @@ traversal taint (the php.net upload pattern). Other sinks still see the value.
 <?php
 function upload(string $dir): void {
     move_uploaded_file($_FILES['f']['tmp_name'], $dir . '/' . basename($_FILES['f']['name']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnrestrictedFileUpload: Uploaded file saved under the client's file name with no extension check — possible web shell upload
 }
 
 function readCached(): string {

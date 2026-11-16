@@ -40,7 +40,7 @@ pub(crate) fn check_builtin_call(
     ea: &mut crate::expr::ExpressionAnalyzer<'_>,
     fn_name_lower: &str,
     args: &[Arg],
-    ctx: &FlowState,
+    ctx: &mut FlowState,
     span: php_ast::Span,
 ) {
     if fn_name_lower == "session_id" && arg(args, 0, "id").is_some_and(|id| is_weak_random(id, ctx))
@@ -88,9 +88,12 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if checks_uploaded_file(fn_name_lower, args, ctx) {
+        ctx.upload_checked = true;
+    }
     if fn_name_lower == "move_uploaded_file"
         && arg(args, 1, "to").is_some_and(|to| is_client_file_name(to, ctx))
-        && !checks_uploaded_files(ea.source)
+        && !ctx.upload_checked
     {
         ea.emit(
             mir_issues::IssueKind::UnrestrictedFileUpload,
@@ -98,16 +101,8 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
-    if fn_name_lower == "header"
-        && !ctx.origin_checked
-        && arg(args, 0, "header").is_some_and(|h| reflects_origin(h, ctx))
-        && allows_credentials(ea.source)
-    {
-        ea.emit(
-            mir_issues::IssueKind::InsecureCors,
-            mir_issues::Severity::Warning,
-            span,
-        );
+    if fn_name_lower == "header" {
+        check_cors_header(ea, args, ctx, span);
     }
     let code_arg = match fn_name_lower {
         "assert" => arg(args, 0, "assertion"),
@@ -748,30 +743,85 @@ pub(crate) fn is_client_file_name(expr: &Expr, ctx: &FlowState) -> bool {
     }
 }
 
-/// Whether the file checks an upload's extension or content anywhere: a `$_FILES[...]['type']`
-/// comparison alone doesn't count, since the client sends that header.
-fn checks_uploaded_files(source: &str) -> bool {
-    let source = source.to_ascii_lowercase();
-    [
+/// A call that checks an uploaded file's extension or content: a type-detecting builtin, or a
+/// string function applied to the client's file name.
+fn checks_uploaded_file(fn_name_lower: &str, args: &[Arg], ctx: &FlowState) -> bool {
+    const DETECTORS: &[&str] = &[
         "pathinfo",
         "getimagesize",
+        "getimagesizefromstring",
         "exif_imagetype",
-        "finfo",
+        "finfo_file",
+        "finfo_buffer",
         "mime_content_type",
         "wp_check_filetype",
-        "imagecreatefrom",
-        "in_array",
-        "array_search",
+        "wp_check_filetype_and_ext",
+    ];
+    const NAME_CHECKS: &[&str] = &[
+        "substr",
+        "strrpos",
+        "strrchr",
+        "explode",
         "preg_match",
         "str_ends_with",
-        "strrchr",
-        "substr",
-        "explode",
-        "guessextension",
-        "getclientoriginalextension",
-    ]
-    .iter()
-    .any(|check| source.contains(check))
+        "in_array",
+    ];
+    DETECTORS.contains(&fn_name_lower)
+        || fn_name_lower.starts_with("imagecreatefrom")
+        || (NAME_CHECKS.contains(&fn_name_lower)
+            && args
+                .iter()
+                .filter_map(|a| a.value())
+                .any(|v| mentions_uploaded_file(v, ctx)))
+}
+
+/// Whether `expr` refers to an upload: its client file name, or a `$_FILES` entry as a whole.
+fn mentions_uploaded_file(expr: &Expr, ctx: &FlowState) -> bool {
+    if is_client_file_name(expr, ctx) {
+        return true;
+    }
+    match &expr.kind {
+        ExprKind::Variable(v) => v.trim_start_matches('$') == "_FILES",
+        ExprKind::ArrayAccess(aa) => {
+            !matches!(
+                literal_str(aa.index.as_ref()),
+                Some("type" | "size" | "error")
+            ) && matches!(&aa.array.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_FILES")
+        }
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => {
+            mentions_uploaded_file(inner, ctx)
+        }
+        ExprKind::FunctionCall(fc) => call_values(&fc.args)
+            .into_iter()
+            .any(|v| mentions_uploaded_file(v, ctx)),
+        _ => false,
+    }
+}
+
+/// Count a condition calling one of the program's own helpers or methods on an upload, such
+/// as `isAllowedUpload($_FILES['f'])`, as a check of it.
+pub(crate) fn mark_upload_checked(cond: &Expr, ctx: &mut FlowState) {
+    let checks = match &cond.kind {
+        ExprKind::UnaryPrefix(u) => return mark_upload_checked(&u.operand, ctx),
+        ExprKind::Parenthesized(inner) => return mark_upload_checked(inner, ctx),
+        ExprKind::FunctionCall(fc) => {
+            fc.name.kind.name_bare().is_some_and(|n| {
+                !crate::stubs::is_builtin_function(&n.trim_start_matches('\\').to_ascii_lowercase())
+            }) && call_values(&fc.args)
+                .into_iter()
+                .any(|v| mentions_uploaded_file(v, ctx))
+        }
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => call_values(&mc.args)
+            .into_iter()
+            .any(|v| mentions_uploaded_file(v, ctx)),
+        ExprKind::StaticMethodCall(sc) => call_values(&sc.args)
+            .into_iter()
+            .any(|v| mentions_uploaded_file(v, ctx)),
+        _ => false,
+    };
+    if checks {
+        ctx.upload_checked = true;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1558,11 +1608,55 @@ fn reflects_origin(header: &Expr, ctx: &FlowState) -> bool {
     false
 }
 
-/// Whether the file sends `Access-Control-Allow-Credentials: true`.
-fn allows_credentials(source: &str) -> bool {
-    source
-        .to_ascii_lowercase()
-        .contains("access-control-allow-credentials: true")
+/// Report a reflected `Access-Control-Allow-Origin` together with
+/// `Access-Control-Allow-Credentials: true`, at the origin header, whichever is sent first.
+fn check_cors_header(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    args: &[Arg],
+    ctx: &mut FlowState,
+    span: php_ast::Span,
+) {
+    let Some(header) = arg(args, 0, "header") else {
+        return;
+    };
+    let emit = |ea: &mut crate::expr::ExpressionAnalyzer<'_>, at| {
+        ea.emit(
+            mir_issues::IssueKind::InsecureCors,
+            mir_issues::Severity::Warning,
+            at,
+        );
+    };
+    if allows_credentials(header) {
+        if let Some(reflection) = ctx.cors_reflection.take() {
+            emit(ea, reflection);
+        }
+        ctx.cors_credentials = true;
+    } else if !ctx.origin_checked && reflects_origin(header, ctx) {
+        if ctx.cors_credentials {
+            emit(ea, span);
+        } else {
+            ctx.cors_reflection = Some(span);
+        }
+    }
+}
+
+/// `Access-Control-Allow-Credentials: true`, in any case and spacing.
+fn allows_credentials(header: &Expr) -> bool {
+    let mut parts = Vec::new();
+    command_parts(header, &mut parts);
+    let mut text = String::new();
+    for part in parts {
+        match part {
+            CommandPart::Text(t) => text.push_str(t),
+            CommandPart::Value(_) => return false,
+        }
+    }
+    let compact: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    compact == "access-control-allow-credentials:true"
 }
 
 // ---------------------------------------------------------------------------

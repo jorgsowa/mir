@@ -23,5 +23,6 @@ function presenceOnly(): void {
         $origin = $_SERVER['HTTP_ORIGIN'];
         header("Access-Control-Allow-Origin: $origin");
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCors: CORS reflects the request's Origin while allowing credentials — any site can read authenticated responses
+        header('Access-Control-Allow-Credentials: true');
     }
 }
