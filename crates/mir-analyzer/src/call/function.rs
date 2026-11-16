@@ -1704,14 +1704,15 @@ impl CallAnalyzer {
                     call.args.first().and_then(|a| a.value()).map(|v| &v.kind)
                 {
                     let var_name = name.as_ref().trim_start_matches('$');
-                    if let Some(handle) = arg_types
-                        .first()
-                        .filter(|t| t.contains(|a| *a == Atomic::TResource))
-                    {
+                    if let Some(handle) = arg_types.first().filter(|t| {
+                        t.contains(|a| matches!(a, Atomic::TResource | Atomic::TOpenResource))
+                    }) {
                         let mut closed = Type::empty();
                         for a in &handle.types {
                             closed.add_type(match a {
-                                Atomic::TResource => Atomic::TClosedResource,
+                                Atomic::TResource | Atomic::TOpenResource => {
+                                    Atomic::TClosedResource
+                                }
                                 other => other.clone(),
                             });
                         }

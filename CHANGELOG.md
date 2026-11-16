@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report a resource closed by `fclose()`/`pclose()`/`closedir()` passed to an `open-resource` parameter as InvalidArgument.
 - Report `0.0` passed to a `non-empty-scalar` parameter as InvalidArgument.
 - Report calls to methods of an `@internal` class from outside the class's root namespace as InternalMethod.
 - Analysis no longer hangs on loops that build recursive arrays, such as `$s = [$s]` in nested loops, which ran past 20 seconds and 6 GB of memory at four levels. A loop variable that still changes after three passes is generalized (literals to their base type, shapes to generic arrays) until it reaches a fixed point. Array types are also capped at 8 levels of nesting, and unions of more than 30 members other than string and int literals are generalized.

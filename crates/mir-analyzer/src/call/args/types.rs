@@ -818,7 +818,7 @@ const RESOURCE_REPLACEMENT_CLASSES: &[&str] = &[
 
 /// `arg` without its `resource` arm when `param` takes a class that replaced that resource.
 fn without_legacy_handle_resource(arg: &Type, param: &Type) -> Option<Type> {
-    if !arg.contains(|a| matches!(a, Atomic::TResource))
+    if !arg.contains(|a| matches!(a, Atomic::TResource | Atomic::TOpenResource))
         || !param.contains(|p| {
             matches!(p, Atomic::TNamedObject { fqcn, .. } if {
                 let name = fqcn.trim_start_matches('\\');
@@ -831,7 +831,8 @@ fn without_legacy_handle_resource(arg: &Type, param: &Type) -> Option<Type> {
         return None;
     }
     let mut rest = arg.clone();
-    rest.types.retain(|a| !matches!(a, Atomic::TResource));
+    rest.types
+        .retain(|a| !matches!(a, Atomic::TResource | Atomic::TOpenResource));
     Some(rest)
 }
 

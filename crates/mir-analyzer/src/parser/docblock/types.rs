@@ -692,7 +692,8 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             u.add_type(Atomic::TString);
             u
         }
-        "resource" | "open-resource" => Type::single(Atomic::TResource),
+        "resource" => Type::single(Atomic::TResource),
+        "open-resource" => Type::single(Atomic::TOpenResource),
         "closed-resource" => Type::single(Atomic::TClosedResource),
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
         "static" | "$this" => Type::single(Atomic::TStaticObject {

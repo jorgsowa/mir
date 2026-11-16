@@ -478,6 +478,8 @@ pub enum Atomic {
     TResource,
     /// `closed-resource` — a handle known to be closed, as after `fclose()`.
     TClosedResource,
+    /// `open-resource` — a handle not known to be closed; rejects only `closed-resource`.
+    TOpenResource,
 
     /// `properties-of<Cls>` and its visibility-filtered forms: a shape built from the class when checked.
     TPropertiesOf { class: Name, filter: PropertyFilter },
@@ -729,7 +731,7 @@ impl Atomic {
             Atomic::TScalar => "scalar",
             Atomic::TNumeric => "numeric",
             Atomic::TObject => "object",
-            Atomic::TResource | Atomic::TClosedResource => "resource",
+            Atomic::TResource | Atomic::TClosedResource | Atomic::TOpenResource => "resource",
             Atomic::TPropertiesOf { .. } => "array",
             Atomic::TNamedObject { .. } => "object",
             Atomic::TStaticObject { .. } => "static",
@@ -827,6 +829,7 @@ enum AtomicTag {
     TObjectShape,
     TResource,
     TClosedResource,
+    TOpenResource,
     TPropertiesOf,
 }
 
@@ -872,6 +875,7 @@ impl Hash for Atomic {
             Atomic::TTraitString => (T::TTraitString as u8).hash(state),
             Atomic::TResource => (T::TResource as u8).hash(state),
             Atomic::TClosedResource => (T::TClosedResource as u8).hash(state),
+            Atomic::TOpenResource => (T::TOpenResource as u8).hash(state),
             Atomic::TPropertiesOf { class, filter } => {
                 (T::TPropertiesOf as u8).hash(state);
                 class.hash(state);

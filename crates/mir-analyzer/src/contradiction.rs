@@ -405,6 +405,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         Atomic::TMixed
         | Atomic::TResource
         | Atomic::TClosedResource
+        | Atomic::TOpenResource
         | Atomic::TScalar
         | Atomic::TNumeric
         | Atomic::TVoid

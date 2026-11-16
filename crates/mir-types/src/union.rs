@@ -616,8 +616,14 @@ impl Type {
         }
         // `resource` covers closed handles too.
         match atomic {
-            Atomic::TClosedResource if self.types.contains(&Atomic::TResource) => return,
-            Atomic::TResource => self.types.retain(|t| *t != Atomic::TClosedResource),
+            Atomic::TClosedResource | Atomic::TOpenResource
+                if self.types.contains(&Atomic::TResource) =>
+            {
+                return
+            }
+            Atomic::TResource => self
+                .types
+                .retain(|t| !matches!(t, Atomic::TClosedResource | Atomic::TOpenResource)),
             _ => {}
         }
         // literal-int sits between the int literals and int.
@@ -1372,7 +1378,7 @@ impl Type {
     /// Narrow as if `is_resource($x)` is true.
     pub fn narrow_to_resource(&self) -> Type {
         let mut out = self.filter(|t| match t {
-            Atomic::TResource | Atomic::TMixed => true,
+            Atomic::TResource | Atomic::TOpenResource | Atomic::TMixed => true,
             Atomic::TTemplateParam { as_type, .. } => as_type.is_mixed(),
             _ => false,
         });
@@ -2048,7 +2054,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         // Null. `void` maps to `Top` (a `void`-typed value is unknown; treating
         // it as "everything" keeps any branch it feeds undecidable).
         Atomic::TNull => vec![Null],
-        Atomic::TResource | Atomic::TClosedResource => vec![Resource],
+        Atomic::TResource | Atomic::TClosedResource | Atomic::TOpenResource => vec![Resource],
         Atomic::TVoid => vec![Top],
         // Everything / scalars.
         Atomic::TMixed => vec![Top],
@@ -2093,6 +2099,7 @@ fn subject_is_decidable(subject: &Atomic) -> bool {
             | Atomic::TObject
             | Atomic::TObjectShape { .. }
             | Atomic::TResource
+            | Atomic::TOpenResource
             | Atomic::TMixed
             | Atomic::TScalar
     )
@@ -2308,7 +2315,12 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         value: Box::new(Type::mixed()),
     };
     match (sub, sup) {
-        (Atomic::TClosedResource, _) => return atomic_subtype(&Atomic::TResource, sup),
+        (Atomic::TClosedResource, Atomic::TOpenResource) => return false,
+        // A handle of unknown state may still be open.
+        (Atomic::TResource, Atomic::TOpenResource) => return true,
+        (Atomic::TClosedResource | Atomic::TOpenResource, _) => {
+            return atomic_subtype(&Atomic::TResource, sup)
+        }
         (Atomic::TPropertiesOf { .. }, _) => return atomic_subtype(&string_keyed_array(), sup),
         (_, Atomic::TPropertiesOf { .. }) => return atomic_subtype(sub, &string_keyed_array()),
         (Atomic::TObjectShape { properties: have }, Atomic::TObjectShape { properties: want }) => {

@@ -404,11 +404,15 @@ pub(crate) fn strip_docblock_resource(native: &Type, mut doc: Type) -> Type {
             .types
             .iter()
             .any(|a| matches!(a, Atomic::TMixed | Atomic::TResource))
-        || !doc.types.iter().any(|a| matches!(a, Atomic::TResource))
+        || !doc
+            .types
+            .iter()
+            .any(|a| matches!(a, Atomic::TResource | Atomic::TOpenResource))
     {
         return doc;
     }
-    doc.types.retain(|a| !matches!(a, Atomic::TResource));
+    doc.types
+        .retain(|a| !matches!(a, Atomic::TResource | Atomic::TOpenResource));
     if doc.types.is_empty() {
         native.clone()
     } else {
