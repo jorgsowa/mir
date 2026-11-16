@@ -80,7 +80,7 @@ pub(crate) fn check_builtin_call(
         }
     }
     if let Some(amount) = resource_amount_arg(fn_name_lower, args) {
-        if is_request_input(amount, ctx) {
+        if is_request_value(ea, amount, ctx) {
             ea.emit(
                 mir_issues::IssueKind::ResourceExhaustion {
                     function: fn_name_lower.to_string(),
@@ -471,8 +471,16 @@ fn weakened_session_setting(name: &str, value: &Value) -> Option<String> {
 type OriginCheck = fn(&Expr, &FlowState) -> bool;
 
 /// Every origin a variable assigned `value` takes on.
-pub(crate) fn assigned_origins(value: &Expr, ctx: &FlowState) -> OriginSet {
+pub(crate) fn assigned_origins(
+    value: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> OriginSet {
     let mut origins = OriginSet::EMPTY;
+    if reads_framework_request(value, ctx, db, file) {
+        origins = origins.with(ValueOrigin::RequestInput);
+    }
     if let Some(origin) = crate::taint::assigned_value_origin(value) {
         origins = origins.with(origin);
     }
@@ -529,6 +537,92 @@ pub(crate) fn is_request_input(expr: &Expr, ctx: &FlowState) -> bool {
                 .first()
                 .and_then(|a| a.value())
                 .is_some_and(|v| is_request_input(v, ctx))
+        }
+        _ => false,
+    }
+}
+
+/// Request data, from a superglobal or read through a framework's request object.
+pub(crate) fn is_request_value(
+    ea: &crate::expr::ExpressionAnalyzer<'_>,
+    expr: &Expr,
+    ctx: &FlowState,
+) -> bool {
+    is_request_input(expr, ctx) || reads_framework_request(expr, ctx, ea.db, &ea.file)
+}
+
+/// Request data read through a framework, possibly cast or trimmed: a Symfony `Request` accessor
+/// or parameter bag (`$request->query->getInt('n')`), a Laravel request or `Request` facade
+/// (`$request->input('n')`), or a PSR-7 server request (`$request->getQueryParams()['n']`).
+pub(crate) fn reads_framework_request(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    use crate::ast_ext::NameResolveExt as _;
+    let recurse = |e: &Expr| reads_framework_request(e, ctx, db, file);
+    let receiver_is = |receiver: &Expr, test: &dyn Fn(&str) -> bool| {
+        crate::expr::assignment::resolve_chained_receiver_type(receiver, ctx, db, file).is_some_and(
+            |ty| {
+                ty.types.iter().any(|a| {
+                    matches!(a, mir_types::Atomic::TNamedObject { fqcn, .. } if test(fqcn.as_ref()))
+                })
+            },
+        )
+    };
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => recurse(inner),
+        ExprKind::NullCoalesce(nc) => recurse(&nc.left),
+        ExprKind::ArrayAccess(aa) => recurse(&aa.array),
+        ExprKind::FunctionCall(fc) => {
+            named_one_of(&fc.name, &["trim", "intval", "strval", "floatval"])
+                && fc.args.first().and_then(|a| a.value()).is_some_and(recurse)
+        }
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            let ExprKind::Identifier(method) = &mc.method.kind else {
+                return false;
+            };
+            let method = crate::util::php_ident_lowercase(method.as_ref());
+            if receiver_is(&mc.object, &|fqcn| {
+                crate::taint::is_framework_request_source(db, fqcn, &method)
+            }) {
+                return true;
+            }
+            let ExprKind::PropertyAccess(pa) = &mc.object.kind else {
+                return false;
+            };
+            let ExprKind::Identifier(bag) = &pa.property.kind else {
+                return false;
+            };
+            matches!(
+                method.as_str(),
+                "get"
+                    | "getint"
+                    | "getalpha"
+                    | "getalnum"
+                    | "getdigits"
+                    | "getboolean"
+                    | "getstring"
+                    | "all"
+                    | "filter"
+            ) && receiver_is(&pa.object, &|fqcn| {
+                crate::taint::is_request_bag_property(db, fqcn, bag)
+            })
+        }
+        ExprKind::StaticMethodCall(sc) => {
+            let ExprKind::Identifier(method) = &sc.method.kind else {
+                return false;
+            };
+            sc.class
+                .kind
+                .resolve_name_ref(db, file)
+                .is_some_and(|class| {
+                    crate::taint::is_laravel_request_facade_source(
+                        &class,
+                        &crate::util::php_ident_lowercase(method.as_ref()),
+                    )
+                })
         }
         _ => false,
     }
@@ -1354,7 +1448,7 @@ pub(crate) fn check_timing_unsafe_comparison(
         BinaryOp::NotIdentical => "!==",
         _ => return,
     };
-    if let Some(what) = timing_unsafe_operand(b, ctx) {
+    if let Some(what) = timing_unsafe_operand(ea, b, ctx) {
         ea.emit(
             mir_issues::IssueKind::TimingUnsafeComparison {
                 what: format!("{what} is compared with {op}"),
@@ -1365,7 +1459,11 @@ pub(crate) fn check_timing_unsafe_comparison(
     }
 }
 
-fn timing_unsafe_operand(b: &php_ast::owned::BinaryExpr, ctx: &FlowState) -> Option<String> {
+fn timing_unsafe_operand(
+    ea: &crate::expr::ExpressionAnalyzer<'_>,
+    b: &php_ast::owned::BinaryExpr,
+    ctx: &FlowState,
+) -> Option<String> {
     let is_literal = |e: &Expr| {
         matches!(
             e.kind,
@@ -1376,9 +1474,9 @@ fn timing_unsafe_operand(b: &php_ast::owned::BinaryExpr, ctx: &FlowState) -> Opt
         if is_mac_digest(one, ctx) && !is_literal(other) {
             return Some("a hash_hmac() digest".to_string());
         }
-        if is_request_input(other, ctx) && !is_request_input(one, ctx) {
-            if let Some(name) = stored_secret_name(one) {
-                return Some(format!("the secret {name}"));
+        if is_request_value(ea, other, ctx) && !is_request_value(ea, one, ctx) {
+            if let Some(name) = stored_secret_name(one, ctx) {
+                return Some(format!("the stored secret '{name}'"));
             }
         }
     }
@@ -1413,10 +1511,16 @@ fn is_mac_digest(expr: &Expr, ctx: &FlowState) -> bool {
 }
 
 /// The variable, property or literal array key naming a stored secret: `$_SESSION['csrf_token']`,
-/// `$this->apiKey`, `$secret`.
-fn stored_secret_name(expr: &Expr) -> Option<String> {
+/// `$this->apiKey`, `$secret`. A parameter usually carries the submitted value, not the stored one.
+fn stored_secret_name(expr: &Expr, ctx: &FlowState) -> Option<String> {
     let name = match &expr.kind {
-        ExprKind::Variable(v) => v.trim_start_matches('$').to_string(),
+        ExprKind::Variable(v) => {
+            let v = v.trim_start_matches('$');
+            if ctx.param_names.contains(&mir_types::Name::from(v)) {
+                return None;
+            }
+            v.to_string()
+        }
         ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
             match &pa.property.kind {
                 ExprKind::Identifier(name) => name.to_string(),
@@ -1424,7 +1528,7 @@ fn stored_secret_name(expr: &Expr) -> Option<String> {
             }
         }
         ExprKind::ArrayAccess(aa) => literal_str(aa.index.as_ref())?.to_string(),
-        ExprKind::Parenthesized(inner) => return stored_secret_name(inner),
+        ExprKind::Parenthesized(inner) => return stored_secret_name(inner, ctx),
         _ => return None,
     };
     names_secret(&name).then_some(name)

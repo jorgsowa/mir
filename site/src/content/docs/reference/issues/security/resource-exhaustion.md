@@ -7,7 +7,7 @@ sidebar:
   order: 831
 ---
 
-A client that picks how much work a request does can tie up memory or workers with one request (CWE-400). Reported when a request value, directly or through a variable, reaches the count of `str_repeat()`, `str_pad()`, `range()` (its end), `array_fill()` or `array_pad()`, or the duration of `sleep()`, `usleep()`, `time_nanosleep()` or `set_time_limit()`. An `(int)` cast or `intval()` doesn't help, since the number itself is the problem. A value capped first, by an upper-bound check that returns or clamps it (`if ($n > 100) { $n = 100; }`) or by `min()`, isn't reported. A lower bound or a `!== 0` check doesn't cap it.
+A client that picks how much work a request does can tie up memory or workers with one request (CWE-400). Reported when a request value, directly or through a variable, reaches the count of `str_repeat()`, `str_pad()`, `range()` (its end), `array_fill()` or `array_pad()`, or the duration of `sleep()`, `usleep()`, `time_nanosleep()` or `set_time_limit()`. An `(int)` cast or `intval()` doesn't help, since the number itself is the problem. A value capped first, by an upper-bound check that returns or clamps it (`if ($n > 100) { $n = 100; }`) or by `min()`, isn't reported. A lower bound or a `!== 0` check doesn't cap it. Request data includes `$_GET`, `$_POST`, `$_REQUEST` and `$_COOKIE`, and values read through Symfony's `Request` and its parameter bags (`$request->query->getInt('n')`), a Laravel request or `Request` facade (`$request->input('n')`), or a PSR-7 server request (`$request->getQueryParams()['n']`).
 
 ## Example
 

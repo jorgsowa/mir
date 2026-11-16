@@ -650,7 +650,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             ctx.mark_plain(name.as_ref());
                         }
                         if !a.by_ref {
-                            let origins = crate::security::assigned_origins(&a.value, ctx);
+                            let origins = crate::security::assigned_origins(
+                                &a.value, ctx, self.db, &self.file,
+                            );
                             ctx.mark_value_origins(name.as_ref(), origins);
                         }
                         if a.by_ref {
@@ -806,7 +808,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let origins = ctx
                         .value_origins(var_name)
                         .intersection(crate::flow_state::ValueOrigin::CONTENT)
-                        .union(crate::security::assigned_origins(&a.value, ctx));
+                        .union(crate::security::assigned_origins(
+                            &a.value, ctx, self.db, &self.file,
+                        ));
                     ctx.set_var(var_name, result_ty.clone());
                     // `.=`'s result keeps the OLD value's content (unlike plain
                     // `=`, which fully replaces it) — so it stays tainted if

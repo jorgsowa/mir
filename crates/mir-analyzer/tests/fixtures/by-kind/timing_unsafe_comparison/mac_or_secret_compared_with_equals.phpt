@@ -25,7 +25,7 @@ function webhook(string $payload, string $key): bool {
 
 function csrf(): void {
     if ($_POST['token'] !== $_SESSION['csrf_token']) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TimingUnsafeComparison: the secret csrf_token is compared with !==, which returns sooner the fewer leading characters match; use hash_equals()
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TimingUnsafeComparison: the stored secret 'csrf_token' is compared with !==, which returns sooner the fewer leading characters match; use hash_equals()
         exit;
     }
 }
@@ -36,6 +36,6 @@ final class Api {
     public function allowed(): bool {
         $given = $_GET['key'] ?? '';
         return $given === $this->apiKey;
-//             ^^^^^^^^^^^^^^^^^^^^^^^^ TimingUnsafeComparison: the secret apiKey is compared with ===, which returns sooner the fewer leading characters match; use hash_equals()
+//             ^^^^^^^^^^^^^^^^^^^^^^^^ TimingUnsafeComparison: the stored secret 'apiKey' is compared with ===, which returns sooner the fewer leading characters match; use hash_equals()
     }
 }
