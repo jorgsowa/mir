@@ -475,19 +475,26 @@ pub(crate) fn resolve_method_from_db(
             _ => owner_fqcn.clone(),
         };
 
+        let owner_class =
+            match crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &owner_fqcn)) {
+                Some(crate::db::ClassLike::Class(c)) => Some(c),
+                _ => None,
+            };
+        // A global-namespace `@internal` class has no root namespace to scope its members to.
+        let internal_class = owner_class
+            .as_ref()
+            .is_some_and(|c| c.is_internal && owner_fqcn.contains('\\'));
         return Some(ResolvedMethod {
             owner_fqcn: owner_fqcn.clone(),
             template_scope,
             name,
             visibility: storage.visibility,
             deprecated: storage.deprecated.clone(),
-            is_internal: storage.is_internal,
-            internal_scope: storage.internal_scope.clone().or_else(|| {
-                match crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &owner_fqcn)) {
-                    Some(crate::db::ClassLike::Class(c)) => c.internal_scope.clone(),
-                    _ => None,
-                }
-            }),
+            is_internal: storage.is_internal || internal_class,
+            internal_scope: storage
+                .internal_scope
+                .clone()
+                .or_else(|| owner_class.and_then(|c| c.internal_scope.clone())),
             is_static: storage.is_static,
             is_abstract: storage.is_abstract,
             is_virtual: storage.is_virtual,

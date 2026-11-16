@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report calls to methods of an `@internal` class from outside the class's root namespace as InternalMethod.
 - Analysis no longer hangs on loops that build recursive arrays, such as `$s = [$s]` in nested loops, which ran past 20 seconds and 6 GB of memory at four levels. A loop variable that still changes after three passes is generalized (literals to their base type, shapes to generic arrays) until it reaches a fixed point. Array types are also capped at 8 levels of nesting, and unions of more than 30 members other than string and int literals are generalized.
 - A union drops an array shape that another shape with the same keys covers (`array{a: 1} | array{a: int}` is `array{a: int}`), and a generic array covered by another through nested arrays. Repeated conditional wrapping such as `if (...) { $v = [$v]; }` and `array_merge($r, ['next' => $r])` chains no longer grow exponentially: 30 `array_merge` steps took 760 MB and printed a 7.5 MB type, and now stay at 64 MB. An int never folds into a float, and shapes holding objects fold only when the objects are identical.
 - A loop's post-loop state and its `continue` handling use only the first and final passes' `break`/`continue` states, instead of re-merging every earlier pass's.

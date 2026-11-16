@@ -1250,6 +1250,15 @@
     <InternalMethod>
       <code><![CDATA[$test->valueObjectForEvents()]]></code>
       <code><![CDATA[$test->valueObjectForEvents()]]></code>
+      <code><![CDATA[EventFacade::instance()]]></code>
+      <code><![CDATA[EventFacade::instance()]]></code>
+      <code><![CDATA[(new TestSuiteBuilder())->build($phpUnitConfiguration)]]></code>
+      <code><![CDATA[$phpUnitTestSuite->tests()]]></code>
+      <code><![CDATA[$phpUnitTestSuite->isForTestClass()]]></code>
+      <code><![CDATA[$phpUnitTestSuite->isEmpty()]]></code>
+      <code><![CDATA[$phpUnitTestSuite->name()]]></code>
+      <code><![CDATA[$phpUnitTestSuite->name()]]></code>
+      <code><![CDATA[$phpUnitTestSuite->tests()]]></code>
     </InternalMethod>
   </file>
   <file src="core/lib/Drupal/Core/Test/PhpUnitTestRunner.php">
