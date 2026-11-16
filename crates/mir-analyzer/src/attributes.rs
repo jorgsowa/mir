@@ -952,7 +952,10 @@ fn check_sensitive_params(
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("SensitiveParameter")
         });
-        if !marked && names_secret(name) && holds_plain_value(param.type_hint.as_ref()) {
+        if !marked
+            && crate::security::names_credential(name)
+            && holds_plain_value(param.type_hint.as_ref())
+        {
             issues.push(Issue::new(
                 IssueKind::MissingSensitiveParameter {
                     param: name.to_string(),
@@ -961,13 +964,6 @@ fn check_sensitive_params(
             ));
         }
     }
-}
-
-fn names_secret(name: &str) -> bool {
-    let name = name.to_ascii_lowercase().replace('_', "");
-    ["password", "secret", "token", "apikey"]
-        .iter()
-        .any(|word| name.ends_with(word))
 }
 
 /// Untyped, `string` or `mixed` (optionally nullable): an object such as a parser token isn't a secret.

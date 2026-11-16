@@ -7,7 +7,7 @@ sidebar:
   order: 817
 ---
 
-Reported when `ini_set()` or `session_start()` options turn off `session.use_strict_mode`, `session.use_only_cookies` or `session.cookie_httponly`, or turn on `session.use_trans_sid`. Also reported for `session_id()` of a `$_GET`, `$_POST` or `$_REQUEST` value, also through a variable, `trim()` or `filter_input()`,, which lets an attacker fix the victim's session. These open the door to session fixation, session IDs in URLs, and session cookies readable from JavaScript. A value counts as written in the source when it is a literal, or a variable, global constant or class constant that holds one literal value at that point (`$mode = 0777; chmod($f, $mode)`, `self::CIPHER`).
+Reported when `ini_set()` or `session_start()` options turn off `session.use_strict_mode`, `session.use_only_cookies` or `session.cookie_httponly`, or turn on `session.use_trans_sid`. Also reported for `session_id()` of a `$_GET`, `$_POST` or `$_REQUEST` value, also through a variable, `trim()` or `filter_input()`, or a query or form parameter read through Symfony's `Request` or a Laravel request, which lets an attacker fix the victim's session. These open the door to session fixation, session IDs in URLs, and session cookies readable from JavaScript. A value counts as written in the source when it is a literal, or a variable, global constant or class constant that holds one literal value at that point (`$mode = 0777; chmod($f, $mode)`, `self::CIPHER`).
 
 ## Example
 

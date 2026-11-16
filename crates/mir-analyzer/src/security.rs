@@ -152,7 +152,10 @@ pub(crate) fn check_builtin_call(
         );
     }
     if fn_name_lower == "session_id"
-        && arg(args, 0, "id").is_some_and(|id| reads_request_parameter(id, ctx))
+        && arg(args, 0, "id").is_some_and(|id| {
+            reads_request_parameter(id, ctx)
+                || framework_request_read(id, ctx, ea.db, &ea.file, false)
+        })
     {
         ea.emit(
             mir_issues::IssueKind::InsecureSessionConfig {
@@ -480,6 +483,9 @@ pub(crate) fn assigned_origins(
     let mut origins = OriginSet::EMPTY;
     if reads_framework_request(value, ctx, db, file) {
         origins = origins.with(ValueOrigin::RequestInput);
+        if !framework_request_read(value, ctx, db, file, false) {
+            origins = origins.with(ValueOrigin::CookieInput);
+        }
     }
     if let Some(origin) = crate::taint::assigned_value_origin(value) {
         origins = origins.with(origin);
@@ -560,8 +566,18 @@ pub(crate) fn reads_framework_request(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> bool {
+    framework_request_read(expr, ctx, db, file, true)
+}
+
+fn framework_request_read(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    cookies: bool,
+) -> bool {
     use crate::ast_ext::NameResolveExt as _;
-    let recurse = |e: &Expr| reads_framework_request(e, ctx, db, file);
+    let recurse = |e: &Expr| framework_request_read(e, ctx, db, file, cookies);
     let receiver_is = |receiver: &Expr, test: &dyn Fn(&str) -> bool| {
         crate::expr::assignment::resolve_chained_receiver_type(receiver, ctx, db, file).is_some_and(
             |ty| {
@@ -584,6 +600,9 @@ pub(crate) fn reads_framework_request(
                 return false;
             };
             let method = crate::util::php_ident_lowercase(method.as_ref());
+            if !cookies && matches!(method.as_str(), "cookie" | "getcookieparams") {
+                return false;
+            }
             if receiver_is(&mc.object, &|fqcn| {
                 crate::taint::is_framework_request_source(db, fqcn, &method)
             }) {
@@ -595,6 +614,9 @@ pub(crate) fn reads_framework_request(
             let ExprKind::Identifier(bag) = &pa.property.kind else {
                 return false;
             };
+            if !cookies && bag.as_ref() == "cookies" {
+                return false;
+            }
             matches!(
                 method.as_str(),
                 "get"
@@ -733,35 +755,71 @@ pub(crate) fn check_weak_random_return(
     }
 }
 
-/// The lowercase words of a camelCase or snake_case identifier: `newPassword` → new, password.
+/// The lowercase words of a camelCase or snake_case identifier: `newPassword` → new, password;
+/// an acronym is one word: `getOTPCode` → get, otp, code.
 fn identifier_words(name: &str) -> Vec<String> {
+    let chars: Vec<char> = name.chars().collect();
     let mut words: Vec<String> = Vec::new();
-    for (i, c) in name.char_indices() {
+    for (i, &c) in chars.iter().enumerate() {
         if c == '_' || c == '-' {
             words.push(String::new());
-        } else if words.is_empty() || (c.is_ascii_uppercase() && i > 0) {
-            words.push(c.to_ascii_lowercase().to_string());
-        } else if let Some(word) = words.last_mut() {
-            word.push(c.to_ascii_lowercase());
+            continue;
+        }
+        let prev = i.checked_sub(1).map(|p| chars[p]);
+        let next_lower = chars.get(i + 1).is_some_and(|n| n.is_ascii_lowercase());
+        let starts_word = c.is_ascii_uppercase()
+            && prev.is_some_and(|p| {
+                p.is_ascii_lowercase()
+                    || p.is_ascii_digit()
+                    || (p.is_ascii_uppercase() && next_lower)
+            });
+        match words.last_mut() {
+            Some(word) if !starts_word => word.push(c.to_ascii_lowercase()),
+            _ => words.push(c.to_ascii_lowercase().to_string()),
         }
     }
     words.retain(|w| !w.is_empty());
     words
 }
 
-/// Whether a function name ends in a word for a secret: `generateToken`, `make_salt`, `newApiKey`.
+/// Whether an identifier ends in a word for a credential: `$password`, `$userpassword`,
+/// `$accessToken`, `$client_secret`, `$apiKey`, `$otp`. Pagination and cursor tokens
+/// (`$nextPageToken`) only locate data.
+pub(crate) fn names_credential(name: &str) -> bool {
+    let words = identifier_words(name);
+    let Some(last) = words.last().map(String::as_str) else {
+        return false;
+    };
+    let before = words.len().checked_sub(2).map(|i| words[i].as_str());
+    if last.ends_with("token")
+        && (matches!(last, "pagetoken" | "cursortoken" | "synctoken")
+            || matches!(
+                before,
+                Some("page" | "next" | "prev" | "previous" | "continuation" | "cursor" | "sync")
+            ))
+    {
+        return false;
+    }
+    ["password", "passwd", "passphrase", "secret", "token"]
+        .iter()
+        .any(|word| last.ends_with(word))
+        || last == "otp"
+        || last.ends_with("apikey")
+        || (last == "key" && before == Some("api"))
+}
+
+/// Whether a function or value name says it must be unpredictable: a credential, or a nonce,
+/// salt, or reset, verification or confirmation code (`generateToken`, `make_salt`).
 fn names_secret(name: &str) -> bool {
     let words = identifier_words(name);
-    let last = words.last().map(String::as_str);
     let last_two =
         (words.len() >= 2).then(|| format!("{}{}", words[words.len() - 2], words[words.len() - 1]));
-    matches!(
-        last,
-        Some("token" | "secret" | "password" | "passwd" | "nonce" | "salt" | "otp")
-    ) || matches!(
-        last_two.as_deref(),
-        Some("apikey" | "resetcode" | "verificationcode" | "confirmationcode")
-    )
+    names_credential(name)
+        || matches!(words.last().map(String::as_str), Some("nonce" | "salt"))
+        || matches!(
+            last_two.as_deref(),
+            Some("resetcode" | "verificationcode" | "confirmationcode" | "otpcode")
+        )
 }
 
 /// A value from a non-cryptographic generator, possibly hashed, encoded or concatenated,
@@ -818,6 +876,9 @@ const WEAK_GENERATORS: &[&str] = &[
     "lcg_value",
     "str_shuffle",
     "array_rand",
+    "time",
+    "microtime",
+    "hrtime",
 ];
 const SECURE_GENERATORS: &[&str] = &["random_bytes", "random_int", "openssl_random_pseudo_bytes"];
 /// Builtins whose result is a function of their arguments' content.

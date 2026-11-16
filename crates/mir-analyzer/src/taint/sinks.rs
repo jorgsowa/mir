@@ -355,6 +355,7 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
 pub fn option_sink_values<'e>(
     fn_name_lower: &str,
     args: &'e [php_ast::owned::Arg],
+    values: &crate::security_value::Values,
 ) -> Vec<(&'e Expr, SinkKind)> {
     let option_kind = |e: &Expr| match e.kind.name_bare() {
         Some("CURLOPT_URL" | "CURLOPT_PROXY") => Some(SinkKind::Ssrf),
@@ -376,7 +377,7 @@ pub fn option_sink_values<'e>(
                 .collect(),
             _ => Vec::new(),
         },
-        "simplexml_load_string" => xml_with_unsafe_flags(args, 0, "data", 2, "options")
+        "simplexml_load_string" => xml_with_unsafe_flags(args, 0, "data", 2, "options", values)
             .map(|v| (v, SinkKind::Xml))
             .into_iter()
             .collect(),
@@ -432,7 +433,9 @@ fn xml_with_unsafe_flags<'e>(
     xml_name: &str,
     flags_index: usize,
     flags_name: &str,
+    values: &crate::security_value::Values,
 ) -> Option<&'e Expr> {
+    const NOENT_DTDLOAD_PARSEHUGE: i64 = 2 | 4 | 524_288;
     let arg = |index: usize, name: &str| {
         args.iter()
             .find(|a| a.name.as_ref().is_some_and(|n| n.last_part() == name))
@@ -440,11 +443,14 @@ fn xml_with_unsafe_flags<'e>(
             .and_then(|a| a.value())
     };
     let flags = arg(flags_index, flags_name)?;
-    ["LIBXML_NOENT", "LIBXML_DTDLOAD", "LIBXML_PARSEHUGE"]
+    let unsafe_flags = ["LIBXML_NOENT", "LIBXML_DTDLOAD", "LIBXML_PARSEHUGE"]
         .iter()
         .any(|flag| has_flag(flags, flag))
-        .then(|| arg(xml_index, xml_name))
-        .flatten()
+        || values
+            .of(flags)
+            .and_then(|v| v.as_int())
+            .is_some_and(|bits| bits & NOENT_DTDLOAD_PARSEHUGE != 0);
+    unsafe_flags.then(|| arg(xml_index, xml_name)).flatten()
 }
 
 /// The value a method call sinks when only some calls are sinks: XML that `DOMDocument::loadXML()`
@@ -455,6 +461,7 @@ pub fn method_sink_value<'e>(
     fqcn: &str,
     method_lower: &str,
     args: &'e [php_ast::owned::Arg],
+    values: &crate::security_value::Values,
 ) -> Vec<(&'e Expr, SinkKind)> {
     let is_a = |base: &str| {
         fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
@@ -481,10 +488,11 @@ pub fn method_sink_value<'e>(
     }
     let value = match method_lower {
         "loadxml" if is_a("DOMDocument") => {
-            xml_with_unsafe_flags(args, 0, "source", 1, "options").map(|v| (v, SinkKind::Xml))
+            xml_with_unsafe_flags(args, 0, "source", 1, "options", values)
+                .map(|v| (v, SinkKind::Xml))
         }
         "xml" if is_a("XMLReader") => {
-            xml_with_unsafe_flags(args, 0, "source", 2, "flags").map(|v| (v, SinkKind::Xml))
+            xml_with_unsafe_flags(args, 0, "source", 2, "flags", values).map(|v| (v, SinkKind::Xml))
         }
         "createtemplate" if is_a("Twig\\Environment") => first().map(|v| (v, SinkKind::Eval)),
         "fetch" | "display" | "createtemplate" if is_a("Smarty") || is_a("Smarty\\Smarty") => {
@@ -703,12 +711,13 @@ pub fn classify_constructor_sink(
     db: &dyn crate::db::MirDatabase,
     fqcn: &str,
     args: &[php_ast::owned::Arg],
+    values: &crate::security_value::Values,
 ) -> Option<SinkKind> {
     let (declarer, _) =
         crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, fqcn), "__construct")?;
     match crate::util::php_ident_lowercase(declarer.as_ref()).as_str() {
         "simplexmlelement" => {
-            xml_with_unsafe_flags(args, 0, "data", 1, "options").map(|_| SinkKind::Xml)
+            xml_with_unsafe_flags(args, 0, "data", 1, "options", values).map(|_| SinkKind::Xml)
         }
         "splfileobject"
         | "directoryiterator"

@@ -1784,9 +1784,20 @@ fn resolve_method_return<'a>(
         {
             crate::taint::check_mongo_filter(ea, filter, ctx, span);
         }
-        for (value, kind) in
-            crate::taint::method_sink_value(ea.db, fqcn.as_ref(), &method_name_lower, &call.args)
-        {
+        let file = ea.file.clone();
+        let values = crate::security_value::Values {
+            ctx: &*ctx,
+            db: ea.db,
+            file: &file,
+        };
+        let sink_values = crate::taint::method_sink_value(
+            ea.db,
+            fqcn.as_ref(),
+            &method_name_lower,
+            &call.args,
+            &values,
+        );
+        for (value, kind) in sink_values {
             let issue = kind.issue();
             if reaches_sink(
                 value,

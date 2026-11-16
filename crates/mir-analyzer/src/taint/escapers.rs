@@ -77,15 +77,20 @@ pub(super) fn filter_call_taint(
             .and_then(|a| a.value())
     };
     let taint_of = |v: Option<&Expr>| v.map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file));
+    let values = crate::security_value::Values { ctx, db, file };
     let (input, filter) = match fn_name_lower {
         "filter_var" => (taint_of(arg(0, "value")), arg(1, "filter")),
         "filter_input" => (Taint::ALL, arg(2, "filter")),
         "filter_var_array" => {
             let input = taint_of(arg(0, "array"));
-            return Some(filter_definition_taint(input, arg(1, "options")));
+            return Some(filter_definition_taint(input, arg(1, "options"), &values));
         }
         "filter_input_array" => {
-            return Some(filter_definition_taint(Taint::ALL, arg(1, "options")));
+            return Some(filter_definition_taint(
+                Taint::ALL,
+                arg(1, "options"),
+                &values,
+            ));
         }
         _ => return None,
     };
@@ -102,7 +107,7 @@ pub(super) fn filter_call_taint(
     if is_callback {
         return Some(input.without(callback_filter_kinds(options)));
     }
-    Some(filter.map_or(input, |f| named_filter_taint(input, f, options)))
+    Some(filter.map_or(input, |f| named_filter_taint(input, f, options, &values)))
 }
 
 /// Kinds the sanitizing builtin named in `['options' => 'htmlspecialchars']` removes.
@@ -127,19 +132,23 @@ fn callback_filter_kinds(options: Option<&Expr>) -> Taint {
 
 /// Taint of the `filter_*_array()` result for a definition: one filter for every element, or an
 /// array holding a filter, or `['filter' => FILTER_X, ...]`, per key.
-fn filter_definition_taint(input: Taint, definition: Option<&Expr>) -> Taint {
+fn filter_definition_taint(
+    input: Taint,
+    definition: Option<&Expr>,
+    values: &crate::security_value::Values,
+) -> Taint {
     let Some(definition) = definition else {
         return input;
     };
     let ExprKind::Array(entries) = &definition.kind else {
-        return named_filter_taint(input, definition, None);
+        return named_filter_taint(input, definition, None, values);
     };
     entries.iter().fold(Taint::NONE, |acc, entry| {
         let (filter, options) = match &entry.value().kind {
             ExprKind::Array(_) => (array_entry(entry.value(), "filter"), Some(entry.value())),
             _ => (Some(entry.value()), None),
         };
-        acc | filter.map_or(input, |f| named_filter_taint(input, f, options))
+        acc | filter.map_or(input, |f| named_filter_taint(input, f, options, values))
     })
 }
 
@@ -158,17 +167,35 @@ fn array_entry<'e>(array: &'e Expr, key: &str) -> Option<&'e Expr> {
 }
 
 /// Whether filter options (a flags value or `['flags' => ...]`) reject private and reserved IPs.
-fn rejects_internal_ips(options: Option<&Expr>) -> bool {
+fn rejects_internal_ips(options: Option<&Expr>, values: &crate::security_value::Values) -> bool {
+    use crate::security_value::Value;
+    const NO_RES_RANGE: i64 = 4_194_304;
+    const NO_PRIV_RANGE: i64 = 8_388_608;
+    const GLOBAL_RANGE: i64 = 536_870_912;
     let Some(options) = options else {
         return false;
     };
     let flags = array_entry(options, "flags").unwrap_or(options);
-    has_flag(flags, "FILTER_FLAG_GLOBAL_RANGE")
+    let named = has_flag(flags, "FILTER_FLAG_GLOBAL_RANGE")
         || (has_flag(flags, "FILTER_FLAG_NO_PRIV_RANGE")
-            && has_flag(flags, "FILTER_FLAG_NO_RES_RANGE"))
+            && has_flag(flags, "FILTER_FLAG_NO_RES_RANGE"));
+    let resolved = match values.of(options) {
+        Some(Value::Int(bits)) => Some(bits),
+        Some(array @ Value::Array(_)) => array.entry("flags").flatten().and_then(Value::as_int),
+        _ => None,
+    };
+    named
+        || resolved.is_some_and(|bits| {
+            bits & GLOBAL_RANGE != 0 || (bits & NO_PRIV_RANGE != 0 && bits & NO_RES_RANGE != 0)
+        })
 }
 
-fn named_filter_taint(input: Taint, filter: &Expr, options: Option<&Expr>) -> Taint {
+fn named_filter_taint(
+    input: Taint,
+    filter: &Expr,
+    options: Option<&Expr>,
+    values: &crate::security_value::Values,
+) -> Taint {
     let Some(filter_name) = filter.kind.name_bare().map(str::to_ascii_uppercase) else {
         return input;
     };
@@ -181,7 +208,9 @@ fn named_filter_taint(input: Taint, filter: &Expr, options: Option<&Expr>) -> Ta
         | "FILTER_SANITIZE_NUMBER_INT"
         | "FILTER_SANITIZE_NUMBER_FLOAT" => Taint::ALL,
         // A valid IP can still name a loopback, private or cloud metadata address.
-        "FILTER_VALIDATE_IP" if !rejects_internal_ips(options) => Taint::ALL.without(Taint::SSRF),
+        "FILTER_VALIDATE_IP" if !rejects_internal_ips(options, values) => {
+            Taint::ALL.without(Taint::SSRF)
+        }
         "FILTER_VALIDATE_IP" => Taint::ALL,
         "FILTER_SANITIZE_SPECIAL_CHARS"
         | "FILTER_SANITIZE_FULL_SPECIAL_CHARS"

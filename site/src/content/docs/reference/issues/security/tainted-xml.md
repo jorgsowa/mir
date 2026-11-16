@@ -7,7 +7,7 @@ sidebar:
   order: 819
 ---
 
-User-controlled input reaches `simplexml_load_string()`, `new SimpleXMLElement()`, `DOMDocument::loadXML()` or `XMLReader::XML()` with `LIBXML_NOENT`, `LIBXML_DTDLOAD` or `LIBXML_PARSEHUGE`. libxml 2.9+ is safe by default; these flags turn on external entity loading (XXE: local file reads, SSRF) or remove the limits that stop billion-laughs denial of service.
+User-controlled input reaches `simplexml_load_string()`, `new SimpleXMLElement()`, `DOMDocument::loadXML()` or `XMLReader::XML()` with `LIBXML_NOENT`, `LIBXML_DTDLOAD` or `LIBXML_PARSEHUGE`. libxml 2.9+ is safe by default; these flags turn on external entity loading (XXE: local file reads, SSRF) or remove the limits that stop billion-laughs denial of service. Flags held in a variable are checked too.
 
 ## Example
 

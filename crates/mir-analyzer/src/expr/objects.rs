@@ -318,7 +318,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::taint::check_command_arguments(self, command, ctx, span);
                     }
                 }
-                let Some(kind) = crate::taint::classify_constructor_sink(self.db, &fqcn, &n.args)
+                let values = crate::security_value::Values {
+                    ctx,
+                    db: self.db,
+                    file: &self.file,
+                };
+                let Some(kind) =
+                    crate::taint::classify_constructor_sink(self.db, &fqcn, &n.args, &values)
                 else {
                     return;
                 };
