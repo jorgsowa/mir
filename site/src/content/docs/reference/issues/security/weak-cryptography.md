@@ -7,7 +7,7 @@ sidebar:
   order: 816
 ---
 
-Reported for a literal cipher in ECB mode or from the DES, RC2, RC4 or Blowfish families, a key or IV written as a string literal, and `openssl_decrypt()` of a GCM, CCM, OCB or ChaCha20-Poly1305 cipher without the `tag` argument, which always fails.
+Reported for a literal cipher in ECB mode or from the DES, RC2, RC4 or Blowfish families, a key or IV written as a string literal, and `openssl_decrypt()` of a GCM, CCM, OCB or ChaCha20-Poly1305 cipher without the `tag` argument, which always fails. A value counts as written in the source when it is a literal, or a variable, global constant or class constant that holds one literal value at that point (`$mode = 0777; chmod($f, $mode)`, `self::CIPHER`).
 
 ## Example
 

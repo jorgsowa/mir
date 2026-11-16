@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `WeakCryptography`, `InsecureFilePermissions`, `InsecurePasswordHash`, `InsecureSessionConfig`, `InsecureTls` and `HardcodedCredential` also read values held in a variable, global constant or class constant with one literal value, such as `chmod($f, self::MODE)` or options built in a variable first. `HardcodedCredential` skips placeholders such as `%env(DB_PASSWORD)%`, `${DB_PASS}`, `{{ password }}`, `<password>` and `****`.
 - A plain `string` passed to a `class-string`, `interface-string`, `enum-string` or `trait-string` parameter is reported as ArgumentTypeCoercion, and `get_class()` / `get_parent_class()` return `class-string`.
 - `AnalysisSnapshot::indexed_references_to` and `indexed_use_import_locations` take an `&IndexCancel`. Cancelling it stops the query inside a file's analysis, at the next loop-body pass, with `Err(Cancelled::Local)` and nothing memoized. `warm_files` and `reanalyze_files` now honor their token the same way.
 - Performance: a loop nested inside another loop starts from its previous fixed point on each outer pass instead of converging from scratch (ten nested `for` loops: 2.3 s → 0.3 s).

@@ -12,7 +12,7 @@ A credential in the source reaches everyone who can read the repository, its his
 - a non-empty string literal as the password of `new PDO()`, `new mysqli()`, `mysqli_connect()`, `mysqli_real_connect()`, `ldap_bind()` and `oci_connect()`, or as the `password=` of a literal `pg_connect()` connection string;
 - string literals shaped like a live secret: an AWS access key ID (`AKIA…`, `ASIA…`), a PEM private key with its key material, or a Stripe live secret key (`sk_live_…`, `rk_live_…`).
 
-Matching known parameters and exact secret formats keeps this precise; it doesn't guess from entropy. AWS's documented example keys (containing `EXAMPLE`) aren't reported. Literal `openssl_encrypt()` keys are reported as `WeakCryptography`.
+Matching known parameters and exact secret formats keeps this precise; it doesn't guess from entropy. AWS's documented example keys (containing `EXAMPLE`) and placeholders such as `%env(DB_PASSWORD)%`, `${DB_PASS}`, `{{ password }}`, `<password>` or `****` aren't reported. Literal `openssl_encrypt()` keys are reported as `WeakCryptography`. A value counts as written in the source when it is a literal, or a variable, global constant or class constant that holds one literal value at that point (`$mode = 0777; chmod($f, $mode)`, `self::CIPHER`).
 
 ## Example
 

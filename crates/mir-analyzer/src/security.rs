@@ -5,6 +5,7 @@ use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::flow_state::{FlowState, OriginSet, ValueOrigin};
+use crate::security_value::{Value, Values};
 
 /// The argument at `index`, or the one named `name`.
 fn arg<'e>(args: &'e [Arg], index: usize, name: &str) -> Option<&'e Expr> {
@@ -21,20 +22,6 @@ fn literal_str(expr: Option<&Expr>) -> Option<&str> {
     }
 }
 
-/// The value under string key `key` of a literal array.
-fn array_entry<'e>(array: &'e Expr, key: &str) -> Option<&'e Expr> {
-    let ExprKind::Array(entries) = &array.kind else {
-        return None;
-    };
-    entries.iter().find_map(|entry| {
-        matches!(
-            entry.key.as_ref().map(|k| &k.kind),
-            Some(ExprKind::String(k)) if k.as_str() == key
-        )
-        .then(|| entry.value())
-    })
-}
-
 /// Report misuse of a security-sensitive builtin visible in its arguments.
 pub(crate) fn check_builtin_call(
     ea: &mut crate::expr::ExpressionAnalyzer<'_>,
@@ -43,6 +30,30 @@ pub(crate) fn check_builtin_call(
     ctx: &mut FlowState,
     span: php_ast::Span,
 ) {
+    let file = ea.file.clone();
+    let values = Values {
+        ctx: &*ctx,
+        db: ea.db,
+        file: &file,
+    };
+    let constant_findings: Vec<mir_issues::IssueKind> = [
+        hardcoded_password(fn_name_lower, args, &values)
+            .map(|what| mir_issues::IssueKind::HardcodedCredential { what }),
+        world_writable_mode(fn_name_lower, args, &values)
+            .map(|reason| mir_issues::IssueKind::InsecureFilePermissions { reason }),
+        password_hash_misuse(fn_name_lower, args, &values)
+            .map(|reason| mir_issues::IssueKind::InsecurePasswordHash { reason }),
+        insecure_session_setting(fn_name_lower, args, &values)
+            .map(|reason| mir_issues::IssueKind::InsecureSessionConfig { reason }),
+        weak_cipher_use(fn_name_lower, args, &values)
+            .map(|reason| mir_issues::IssueKind::WeakCryptography { reason }),
+        disabled_tls_verification(fn_name_lower, args, &values)
+            .filter(|_| !ctx.tls_opt_out)
+            .map(|reason| mir_issues::IssueKind::InsecureTls { reason }),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     if fn_name_lower == "session_id" && arg(args, 0, "id").is_some_and(|id| is_weak_random(id, ctx))
     {
         ea.emit(
@@ -124,26 +135,8 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
-    if let Some(what) = hardcoded_password(fn_name_lower, args) {
-        ea.emit(
-            mir_issues::IssueKind::HardcodedCredential { what },
-            mir_issues::Severity::Warning,
-            span,
-        );
-    }
-    if let Some(reason) = world_writable_mode(fn_name_lower, args) {
-        ea.emit(
-            mir_issues::IssueKind::InsecureFilePermissions { reason },
-            mir_issues::Severity::Warning,
-            span,
-        );
-    }
-    if let Some(reason) = password_hash_misuse(fn_name_lower, args) {
-        ea.emit(
-            mir_issues::IssueKind::InsecurePasswordHash { reason },
-            mir_issues::Severity::Warning,
-            span,
-        );
+    for kind in constant_findings {
+        ea.emit(kind, mir_issues::Severity::Warning, span);
     }
     if matches!(fn_name_lower, "password_hash" | "password_verify") {
         ea.password_prehash = arg(args, 0, "password").map(|p| p.span);
@@ -158,25 +151,14 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
-    if let Some(reason) = insecure_session_setting(fn_name_lower, args, ctx) {
-        ea.emit(
-            mir_issues::IssueKind::InsecureSessionConfig { reason },
-            mir_issues::Severity::Warning,
-            span,
-        );
-    }
-    if let Some(reason) = weak_cipher_use(fn_name_lower, args) {
-        ea.emit(
-            mir_issues::IssueKind::WeakCryptography { reason },
-            mir_issues::Severity::Warning,
-            span,
-        );
-    }
-    if let Some(reason) =
-        disabled_tls_verification(fn_name_lower, args).filter(|_| !ctx.tls_opt_out)
+    if fn_name_lower == "session_id"
+        && arg(args, 0, "id").is_some_and(|id| reads_request_parameter(id, ctx))
     {
         ea.emit(
-            mir_issues::IssueKind::InsecureTls { reason },
+            mir_issues::IssueKind::InsecureSessionConfig {
+                reason: "session_id() takes the ID from a request parameter (session fixation)"
+                    .to_string(),
+            },
             mir_issues::Severity::Warning,
             span,
         );
@@ -189,30 +171,28 @@ pub(crate) fn check_builtin_call(
 
 /// A curl option or `ssl` stream context option, written as a literal, that turns off checking
 /// the server's certificate or host name.
-fn disabled_tls_verification(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+fn disabled_tls_verification(fn_name_lower: &str, args: &[Arg], v: &Values) -> Option<String> {
+    let value_of = |index: usize, name: &str| v.of(arg(args, index, name)?);
     match fn_name_lower {
-        "curl_setopt" => curl_option_off(arg(args, 1, "option")?, arg(args, 2, "value")?),
-        "curl_setopt_array" => {
-            let ExprKind::Array(entries) = &arg(args, 1, "options")?.kind else {
-                return None;
-            };
-            entries
-                .iter()
-                .find_map(|e| curl_option_off(e.key.as_ref()?, e.value()))
-        }
-        "stream_context_create" => ssl_options_off(array_entry(arg(args, 0, "options")?, "ssl")?),
+        "curl_setopt" => curl_option_off(&value_of(1, "option")?, &value_of(2, "value")?),
+        "curl_setopt_array" => value_of(1, "options")?
+            .entries()
+            .iter()
+            .find_map(|(k, val)| curl_option_off(k.as_ref()?, val.as_ref()?)),
+        "stream_context_create" => ssl_options_off(&value_of(0, "options")?),
         "stream_context_set_option" => {
-            let second = arg(args, 1, "wrapper_or_options")?;
-            if literal_str(Some(second)).is_some_and(|w| w.eq_ignore_ascii_case("ssl")) {
-                let name = literal_str(arg(args, 2, "option_name"))?;
-                ssl_option_off(name, arg(args, 3, "value")?)
+            let second = value_of(1, "wrapper_or_options")?;
+            if second
+                .as_str()
+                .is_some_and(|w| w.eq_ignore_ascii_case("ssl"))
+            {
+                let name = value_of(2, "option_name")?;
+                ssl_option_off(name.as_str()?, &value_of(3, "value")?)
             } else {
-                ssl_options_off(array_entry(second, "ssl")?)
+                ssl_options_off(&second)
             }
         }
-        "stream_context_set_options" => {
-            ssl_options_off(array_entry(arg(args, 1, "options")?, "ssl")?)
-        }
+        "stream_context_set_options" => ssl_options_off(&value_of(1, "options")?),
         _ => None,
     }
 }
@@ -259,47 +239,45 @@ fn mentions_tls_setting(expr: &Expr) -> bool {
     }
 }
 
-fn is_literal_off(value: &Expr) -> bool {
-    match &value.kind {
-        ExprKind::Bool(false) | ExprKind::Int(0) => true,
-        ExprKind::Parenthesized(inner) => is_literal_off(inner),
-        _ => false,
-    }
+fn is_off(value: &Value) -> bool {
+    matches!(value, Value::Bool(false) | Value::Int(0))
 }
 
-fn curl_option_off(option: &Expr, value: &Expr) -> Option<String> {
-    let what = match option.kind.name_bare()? {
-        "CURLOPT_SSL_VERIFYPEER" => "any certificate is accepted",
-        "CURLOPT_SSL_VERIFYHOST" => "a certificate for any host is accepted",
-        "CURLOPT_PROXY_SSL_VERIFYPEER" => "any proxy certificate is accepted",
-        "CURLOPT_PROXY_SSL_VERIFYHOST" => "a proxy certificate for any host is accepted",
+fn curl_option_off(option: &Value, value: &Value) -> Option<String> {
+    let (name, what) = match option.as_int()? {
+        64 => ("CURLOPT_SSL_VERIFYPEER", "any certificate is accepted"),
+        81 => (
+            "CURLOPT_SSL_VERIFYHOST",
+            "a certificate for any host is accepted",
+        ),
+        248 => (
+            "CURLOPT_PROXY_SSL_VERIFYPEER",
+            "any proxy certificate is accepted",
+        ),
+        249 => (
+            "CURLOPT_PROXY_SSL_VERIFYHOST",
+            "a proxy certificate for any host is accepted",
+        ),
         _ => return None,
     };
-    is_literal_off(value).then(|| {
-        format!(
-            "{} is off, so {what}",
-            option.kind.name_bare().unwrap_or_default()
-        )
-    })
+    is_off(value).then(|| format!("{name} is off, so {what}"))
 }
 
-fn ssl_options_off(ssl: &Expr) -> Option<String> {
-    let ExprKind::Array(entries) = &ssl.kind else {
-        return None;
-    };
-    entries.iter().find_map(|e| {
-        let name = literal_str(e.key.as_ref())?;
-        ssl_option_off(name, e.value())
-    })
+fn ssl_options_off(options: &Value) -> Option<String> {
+    options
+        .entry("ssl")??
+        .entries()
+        .iter()
+        .find_map(|(k, val)| ssl_option_off(k.as_ref()?.as_str()?, val.as_ref()?))
 }
 
-fn ssl_option_off(name: &str, value: &Expr) -> Option<String> {
+fn ssl_option_off(name: &str, value: &Value) -> Option<String> {
     let what = match name {
         "verify_peer" => "any certificate is accepted",
         "verify_peer_name" => "a certificate for any host is accepted",
         _ => return None,
     };
-    is_literal_off(value).then(|| format!("ssl option {name} is off, so {what}"))
+    is_off(value).then(|| format!("ssl option {name} is off, so {what}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -352,31 +330,32 @@ fn names_password(expr: &Expr) -> bool {
     })
 }
 
-fn password_hash_misuse(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+fn password_hash_misuse(fn_name_lower: &str, args: &[Arg], v: &Values) -> Option<String> {
     if fn_name_lower != "password_hash" {
         return None;
     }
-    let bcrypt = match arg(args, 1, "algo").map(|a| &a.kind) {
-        None | Some(ExprKind::Null) => true,
-        Some(ExprKind::String(s)) => s.as_str() == "2y",
-        Some(algo) => matches!(
-            algo.name_bare(),
-            Some("PASSWORD_BCRYPT" | "PASSWORD_DEFAULT")
-        ),
+    let bcrypt = match arg(args, 1, "algo") {
+        None => true,
+        Some(algo) => match v.of(algo) {
+            Some(Value::Null) => true,
+            Some(Value::Str(s)) => &*s == "2y",
+            _ => matches!(
+                algo.kind.name_bare(),
+                Some("PASSWORD_BCRYPT" | "PASSWORD_DEFAULT")
+            ),
+        },
     };
     if bcrypt && arg(args, 0, "password").is_some_and(is_raw_digest) {
         return Some(
             "a raw binary digest can contain NUL bytes, where bcrypt stops reading".to_string(),
         );
     }
-    let options = arg(args, 2, "options")?;
-    if array_entry(options, "salt").is_some() {
+    let options = v.of(arg(args, 2, "options")?)?;
+    if options.entry("salt").is_some() {
         return Some("password_hash() ignores the 'salt' option since PHP 8.0".to_string());
     }
-    match array_entry(options, "cost").map(|c| &c.kind) {
-        Some(ExprKind::Int(cost)) if bcrypt && *cost < 10 => {
-            Some(format!("bcrypt cost {cost} is below 10"))
-        }
+    match options.entry("cost").flatten().and_then(Value::as_int) {
+        Some(cost) if bcrypt && cost < 10 => Some(format!("bcrypt cost {cost} is below 10")),
         _ => None,
     }
 }
@@ -402,11 +381,15 @@ fn is_raw_digest(expr: &Expr) -> bool {
 // Ciphers
 // ---------------------------------------------------------------------------
 
-fn weak_cipher_use(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+fn weak_cipher_use(fn_name_lower: &str, args: &[Arg], v: &Values) -> Option<String> {
     if !matches!(fn_name_lower, "openssl_encrypt" | "openssl_decrypt") {
         return None;
     }
-    let cipher = literal_str(arg(args, 1, "cipher_algo")).map(str::to_ascii_lowercase);
+    let string_at = |index: usize, name: &str| match v.of(arg(args, index, name)?) {
+        Some(Value::Str(s)) => Some(s),
+        _ => None,
+    };
+    let cipher = string_at(1, "cipher_algo").map(|c| c.to_ascii_lowercase());
     if let Some(cipher) = &cipher {
         let broken = ["des", "rc2", "rc4", "bf", "blowfish"]
             .iter()
@@ -420,10 +403,10 @@ fn weak_cipher_use(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
             ));
         }
     }
-    if literal_str(arg(args, 2, "passphrase")).is_some() {
+    if string_at(2, "passphrase").is_some() {
         return Some("the key is hardcoded".to_string());
     }
-    if literal_str(arg(args, 4, "iv")).is_some_and(|iv| !iv.is_empty()) {
+    if string_at(4, "iv").is_some_and(|iv| !iv.is_empty()) {
         return Some("the IV is hardcoded; use a fresh random IV for every message".to_string());
     }
     let aead = cipher.as_deref().is_some_and(|c| {
@@ -440,36 +423,34 @@ fn weak_cipher_use(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
 // Session settings
 // ---------------------------------------------------------------------------
 
-fn insecure_session_setting(fn_name_lower: &str, args: &[Arg], ctx: &FlowState) -> Option<String> {
+fn insecure_session_setting(fn_name_lower: &str, args: &[Arg], v: &Values) -> Option<String> {
     match fn_name_lower {
         "ini_set" => {
-            let name = literal_str(arg(args, 0, "option"))?.to_ascii_lowercase();
-            weakened_session_setting(name.strip_prefix("session.")?, arg(args, 1, "value")?)
+            let name = v
+                .of(arg(args, 0, "option")?)?
+                .as_str()?
+                .to_ascii_lowercase();
+            let value = v.of(arg(args, 1, "value")?)?;
+            weakened_session_setting(name.strip_prefix("session.")?, &value)
         }
-        "session_id" if arg(args, 0, "id").is_some_and(|id| reads_request_parameter(id, ctx)) => {
-            Some(
-                "session_id() takes the ID from a request parameter (session fixation)".to_string(),
-            )
-        }
-        "session_start" => {
-            let ExprKind::Array(entries) = &arg(args, 0, "options")?.kind else {
-                return None;
-            };
-            entries.iter().find_map(|entry| {
-                let key = literal_str(entry.key.as_ref())?.to_ascii_lowercase();
-                weakened_session_setting(&key, entry.value())
-            })
-        }
+        "session_start" => v
+            .of(arg(args, 0, "options")?)?
+            .entries()
+            .iter()
+            .find_map(|(k, val)| {
+                let key = k.as_ref()?.as_str()?.to_ascii_lowercase();
+                weakened_session_setting(&key, val.as_ref()?)
+            }),
         _ => None,
     }
 }
 
-/// The reason a literal `value` for session setting `name` weakens the session.
-fn weakened_session_setting(name: &str, value: &Expr) -> Option<String> {
-    let enabled = match &value.kind {
-        ExprKind::Bool(b) => *b,
-        ExprKind::Int(i) => *i != 0,
-        ExprKind::String(s) => match s.as_str().to_ascii_lowercase().as_str() {
+/// The reason a constant `value` for session setting `name` weakens the session.
+fn weakened_session_setting(name: &str, value: &Value) -> Option<String> {
+    let enabled = match value {
+        Value::Bool(b) => *b,
+        Value::Int(i) => *i != 0,
+        Value::Str(s) => match s.to_ascii_lowercase().as_str() {
             "1" | "on" | "true" | "yes" => true,
             "0" | "off" | "false" | "no" | "" => false,
             _ => return None,
@@ -1816,12 +1797,9 @@ pub(crate) fn check_ldap_bind(
 
 /// `chmod()` to a literal mode, or `umask()` to a literal mask, that leaves files writable by
 /// every user. `mkdir()` isn't checked: the umask applies to its mode, which defaults to 0777.
-fn world_writable_mode(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+fn world_writable_mode(fn_name_lower: &str, args: &[Arg], v: &Values) -> Option<String> {
     const OTHERS_WRITE: i64 = 0o002;
-    let literal = |e: Option<&Expr>| match e.map(|e| &e.kind) {
-        Some(ExprKind::Int(i)) => Some(*i),
-        _ => None,
-    };
+    let literal = |e: Option<&Expr>| v.of(e?)?.as_int();
     match fn_name_lower {
         "chmod" => literal(arg(args, 1, "permissions"))
             .filter(|mode| mode & OTHERS_WRITE != 0)
@@ -1844,11 +1822,18 @@ pub(crate) fn check_constructor_call(
     ea: &mut crate::expr::ExpressionAnalyzer<'_>,
     fqcn: &str,
     args: &[Arg],
+    ctx: &FlowState,
     span: php_ast::Span,
 ) {
     let class = fqcn.trim_start_matches('\\');
+    let file = ea.file.clone();
+    let values = Values {
+        ctx,
+        db: ea.db,
+        file: &file,
+    };
     let takes_password = class.eq_ignore_ascii_case("PDO") || class.eq_ignore_ascii_case("mysqli");
-    if takes_password && is_password_literal(arg(args, 2, "password")) {
+    if takes_password && is_password_literal(arg(args, 2, "password"), &values) {
         ea.emit(
             mir_issues::IssueKind::HardcodedCredential {
                 what: format!("the password passed to new {class}()"),
@@ -1859,27 +1844,44 @@ pub(crate) fn check_constructor_call(
     }
 }
 
-fn is_password_literal(expr: Option<&Expr>) -> bool {
-    literal_str(expr).is_some_and(|s| !s.is_empty())
+/// A password written in the source: a non-empty constant string that isn't a placeholder such as
+/// `%env(DB_PASS)%`, `${DB_PASS}`, `{{ password }}`, `<password>` or `****`.
+fn is_password_literal(expr: Option<&Expr>, v: &Values) -> bool {
+    let Some(Value::Str(s)) = expr.and_then(|e| v.of(e)) else {
+        return false;
+    };
+    !s.is_empty() && !is_placeholder(&s)
+}
+
+fn is_placeholder(s: &str) -> bool {
+    let wrapped = |open: &str, close: &str| s.starts_with(open) && s.ends_with(close);
+    let mut chars = s.chars();
+    let first = chars.next();
+    wrapped("%", "%")
+        || wrapped("<", ">")
+        || s.contains("${")
+        || s.contains("{{")
+        || (s.len() >= 3 && chars.all(|c| Some(c) == first))
 }
 
 /// A literal password at a builtin's password parameter, or in a `pg_connect()` string.
-fn hardcoded_password(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+fn hardcoded_password(fn_name_lower: &str, args: &[Arg], v: &Values) -> Option<String> {
     let password = match fn_name_lower {
         "mysqli_connect" | "ldap_bind" => arg(args, 2, "password"),
         "mysqli_real_connect" => arg(args, 3, "password"),
         "oci_connect" | "oci_pconnect" | "oci_new_connect" => arg(args, 1, "password"),
         "pg_connect" | "pg_pconnect" => {
-            let conn = literal_str(arg(args, 0, "connection_string"))?;
+            let conn = v.of(arg(args, 0, "connection_string")?)?;
+            let conn = conn.as_str()?;
             let value = conn
                 .split_whitespace()
                 .find_map(|p| p.strip_prefix("password="))?;
-            return (!value.is_empty() && value != "''")
+            return (!value.is_empty() && value != "''" && !is_placeholder(value))
                 .then(|| format!("the password in the {fn_name_lower}() connection string"));
         }
         _ => return None,
     };
-    is_password_literal(password).then(|| format!("the password passed to {fn_name_lower}()"))
+    is_password_literal(password, v).then(|| format!("the password passed to {fn_name_lower}()"))
 }
 
 /// Report a string literal shaped like a live secret: an AWS access key ID, a private key or a
