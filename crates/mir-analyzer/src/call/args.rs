@@ -905,6 +905,33 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
             // into per-element bindings; `.get` yields `None` there.
             let arg_expr = args.get(*arg_idx).and_then(|a| a.value());
 
+            // `non-empty-scalar`'s float member is stored as plain `float`, which admits zero.
+            if let Some(raw) = param
+                .doc_type_raw
+                .as_deref()
+                .filter(|raw| declares_non_empty_scalar(raw))
+                .filter(|_| {
+                    arg_expr.is_some_and(is_zero_float_literal)
+                        || (!arg_ty.types.is_empty()
+                            && arg_ty
+                                .types
+                                .iter()
+                                .all(|a| matches!(a, Atomic::TLiteralFloat(0, 0))))
+                })
+            {
+                ea.emit(
+                    IssueKind::InvalidArgument {
+                        param: param.name.to_string(),
+                        fn_name: fn_name.to_string(),
+                        expected: raw.to_string(),
+                        actual: "0.0".to_string(),
+                    },
+                    Severity::Error,
+                    *arg_span,
+                );
+                continue;
+            }
+
             // types::check_one handles the full per-binding sequence: callable-sig validations,
             // null checks (via nullability::check_one), and type-compat checks.
             types::check_one(
@@ -920,6 +947,29 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 arg_expr,
             );
         }
+    }
+}
+
+fn declares_non_empty_scalar(raw: &str) -> bool {
+    !raw.contains(['<', '{', '('])
+        && raw.split('|').any(|member| {
+            member
+                .trim()
+                .trim_start_matches('?')
+                .eq_ignore_ascii_case("non-empty-scalar")
+        })
+}
+
+fn is_zero_float_literal(expr: &php_ast::owned::Expr) -> bool {
+    use php_ast::ast::UnaryPrefixOp;
+    use php_ast::owned::ExprKind;
+    match &expr.kind {
+        ExprKind::Float(f) => *f == 0.0,
+        ExprKind::Parenthesized(inner) => is_zero_float_literal(inner),
+        ExprKind::UnaryPrefix(u) if matches!(u.op, UnaryPrefixOp::Negate | UnaryPrefixOp::Plus) => {
+            is_zero_float_literal(&u.operand)
+        }
+        _ => false,
     }
 }
 
