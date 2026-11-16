@@ -7,7 +7,7 @@ sidebar:
   order: 817
 ---
 
-Reported when `ini_set()` or `session_start()` options turn off `session.use_strict_mode`, `session.use_only_cookies` or `session.cookie_httponly`, or turn on `session.use_trans_sid`. Also reported for `session_id()` of a `$_GET`, `$_POST` or `$_REQUEST` value, which lets an attacker fix the victim's session. These open the door to session fixation, session IDs in URLs, and session cookies readable from JavaScript.
+Reported when `ini_set()` or `session_start()` options turn off `session.use_strict_mode`, `session.use_only_cookies` or `session.cookie_httponly`, or turn on `session.use_trans_sid`. Also reported for `session_id()` of a `$_GET`, `$_POST` or `$_REQUEST` value, also through a variable, `trim()` or `filter_input()`,, which lets an attacker fix the victim's session. These open the door to session fixation, session IDs in URLs, and session cookies readable from JavaScript.
 
 ## Example
 

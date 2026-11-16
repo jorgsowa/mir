@@ -145,7 +145,7 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
-    if let Some(reason) = insecure_session_setting(fn_name_lower, args) {
+    if let Some(reason) = insecure_session_setting(fn_name_lower, args, ctx) {
         ea.emit(
             mir_issues::IssueKind::InsecureSessionConfig { reason },
             mir_issues::Severity::Warning,
@@ -253,15 +253,17 @@ fn weak_cipher_use(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
 // Session settings
 // ---------------------------------------------------------------------------
 
-fn insecure_session_setting(fn_name_lower: &str, args: &[Arg]) -> Option<String> {
+fn insecure_session_setting(fn_name_lower: &str, args: &[Arg], ctx: &FlowState) -> Option<String> {
     match fn_name_lower {
         "ini_set" => {
             let name = literal_str(arg(args, 0, "option"))?.to_ascii_lowercase();
             weakened_session_setting(name.strip_prefix("session.")?, arg(args, 1, "value")?)
         }
-        "session_id" if arg(args, 0, "id").is_some_and(reads_request_parameter) => Some(
-            "session_id() takes the ID from a request parameter (session fixation)".to_string(),
-        ),
+        "session_id" if arg(args, 0, "id").is_some_and(|id| reads_request_parameter(id, ctx)) => {
+            Some(
+                "session_id() takes the ID from a request parameter (session fixation)".to_string(),
+            )
+        }
         "session_start" => {
             let ExprKind::Array(entries) = &arg(args, 0, "options")?.kind else {
                 return None;
@@ -305,6 +307,9 @@ pub(crate) fn assigned_origins(value: &Expr, ctx: &FlowState) -> OriginSet {
     let mut origins = OriginSet::EMPTY;
     if let Some(origin) = crate::taint::assigned_value_origin(value) {
         origins = origins.with(origin);
+    }
+    if reads_cookie(value) {
+        origins = origins.with(ValueOrigin::CookieInput);
     }
     if crate::taint::has_dynamic_where_clause(value) {
         origins = origins.with(ValueOrigin::NoSqlWhere);
@@ -360,15 +365,51 @@ pub(crate) fn is_request_input(expr: &Expr, ctx: &FlowState) -> bool {
     }
 }
 
-/// `$_GET['x']`, `$_POST['x']` or `$_REQUEST['x']`, possibly cast or with a `??` fallback.
-fn reads_request_parameter(expr: &Expr) -> bool {
+/// `$_GET['x']`, `$_POST['x']` or `$_REQUEST['x']`, possibly cast, trimmed or with a `??`
+/// fallback, `filter_input(INPUT_GET, ...)`, or a variable holding request data. A session ID
+/// from `$_COOKIE` is where PHP itself reads it, so that isn't counted.
+fn reads_request_parameter(expr: &Expr, ctx: &FlowState) -> bool {
     match &expr.kind {
         ExprKind::ArrayAccess(aa) => {
             matches!(&aa.array.kind, ExprKind::Variable(v) if matches!(&**v, "_GET" | "_POST" | "_REQUEST"))
-                || reads_request_parameter(&aa.array)
+                || reads_request_parameter(&aa.array, ctx)
         }
-        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => reads_request_parameter(inner),
-        ExprKind::NullCoalesce(nc) => reads_request_parameter(&nc.left),
+        ExprKind::Variable(v) => {
+            let origins = ctx.value_origins(v);
+            origins.contains(ValueOrigin::RequestInput)
+                && !origins.contains(ValueOrigin::CookieInput)
+        }
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => {
+            reads_request_parameter(inner, ctx)
+        }
+        ExprKind::NullCoalesce(nc) => reads_request_parameter(&nc.left, ctx),
+        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, &["filter_input"]) => matches!(
+            arg(&fc.args, 0, "type").and_then(|t| t.kind.name_bare()),
+            Some("INPUT_GET" | "INPUT_POST" | "INPUT_REQUEST")
+        ),
+        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, &["trim", "strval", "urldecode"]) => {
+            fc.args
+                .first()
+                .and_then(|a| a.value())
+                .is_some_and(|v| reads_request_parameter(v, ctx))
+        }
+        _ => false,
+    }
+}
+
+/// A `$_COOKIE` entry, possibly cast, trimmed or with a `??` fallback.
+fn reads_cookie(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::ArrayAccess(aa) => {
+            matches!(&aa.array.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_COOKIE")
+        }
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => reads_cookie(inner),
+        ExprKind::NullCoalesce(nc) => reads_cookie(&nc.left),
+        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, &["trim", "strval"]) => fc
+            .args
+            .first()
+            .and_then(|a| a.value())
+            .is_some_and(reads_cookie),
         _ => false,
     }
 }

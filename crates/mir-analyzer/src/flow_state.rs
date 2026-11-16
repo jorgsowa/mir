@@ -122,6 +122,8 @@ pub enum ValueOrigin {
     VerifyResultBool,
     /// A MongoDB filter array with a `$where` clause that isn't a literal.
     NoSqlWhere,
+    /// A value read from `$_COOKIE`.
+    CookieInput,
 }
 
 impl ValueOrigin {
