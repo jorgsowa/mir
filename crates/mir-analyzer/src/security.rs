@@ -306,6 +306,13 @@ pub(crate) fn assigned_origins(value: &Expr, ctx: &FlowState) -> OriginSet {
     if let Some(origin) = crate::taint::assigned_value_origin(value) {
         origins = origins.with(origin);
     }
+    if let ExprKind::FunctionCall(fc) = &value.kind {
+        match verifier_success(&fc.name) {
+            Some("1") => origins = origins.with(ValueOrigin::VerifyResult),
+            Some(_) => origins = origins.with(ValueOrigin::VerifyResultBool),
+            None => {}
+        }
+    }
     let checks: [(OriginCheck, ValueOrigin); 7] = [
         (is_weak_random, ValueOrigin::WeakRandom),
         (is_decoded, ValueOrigin::Decoded),
@@ -1091,11 +1098,11 @@ pub(crate) fn check_condition(
     ctx: &FlowState,
 ) {
     for part in condition_parts(cond) {
-        if let Some(function) = error_value_passes(part) {
+        if let Some(Verifier { label, success }) = error_value_passes(part, ctx) {
             ea.emit(
                 mir_issues::IssueKind::InsecureCheckResult {
                     reason: format!(
-                        "{function}() returns -1 on error, which passes this check; compare with === 1"
+                        "{label} is -1 on error, which passes this check; compare with === {success}"
                     ),
                 },
                 mir_issues::Severity::Warning,
@@ -1112,18 +1119,24 @@ pub(crate) fn check_condition(
     }
 }
 
-/// The verifying function whose `-1` error result a condition lets through, as it treats any
+/// A verification result and the value that alone means success.
+struct Verifier {
+    label: String,
+    success: &'static str,
+}
+
+/// The verification result whose `-1` error value a condition lets through, as it treats any
 /// truthy result as success: `if (openssl_verify(...))`, `openssl_verify(...) != 0`.
-fn error_value_passes(check: &Expr) -> Option<&str> {
-    if let Some(name) = verifier(check) {
-        return Some(name);
+fn error_value_passes(check: &Expr, ctx: &FlowState) -> Option<Verifier> {
+    if let Some(found) = verifier(check, ctx) {
+        return Some(found);
     }
     let ExprKind::Binary(b) = &check.kind else {
         return None;
     };
-    let (call, literal) = match (verifier(&b.left), verifier(&b.right)) {
-        (Some(name), _) => (name, &b.right.kind),
-        (_, Some(name)) => (name, &b.left.kind),
+    let (call, literal) = match (verifier(&b.left, ctx), verifier(&b.right, ctx)) {
+        (Some(found), _) => (found, &b.right.kind),
+        (_, Some(found)) => (found, &b.left.kind),
         _ => return None,
     };
     use php_ast::ast::BinaryOp;
@@ -1138,16 +1151,39 @@ fn error_value_passes(check: &Expr) -> Option<&str> {
     passes.then_some(call)
 }
 
-fn verifier(e: &Expr) -> Option<&str> {
-    const VERIFIERS: &[&str] = &[
-        "openssl_verify",
-        "openssl_x509_verify",
-        "openssl_pkcs7_verify",
-        "ldap_compare",
-    ];
+fn verifier(e: &Expr, ctx: &FlowState) -> Option<Verifier> {
     match &e.kind {
-        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, VERIFIERS) => fc.name.kind.name_bare(),
+        ExprKind::FunctionCall(fc) => Some(Verifier {
+            success: verifier_success(&fc.name)?,
+            label: format!("{}()", fc.name.kind.name_bare()?.trim_start_matches('\\')),
+        }),
+        ExprKind::Variable(v) => {
+            let origins = ctx.value_origins(v);
+            let success = if origins.contains(ValueOrigin::VerifyResult) {
+                "1"
+            } else if origins.contains(ValueOrigin::VerifyResultBool) {
+                "true"
+            } else {
+                return None;
+            };
+            Some(Verifier {
+                label: format!("${}, a verification result,", v.trim_start_matches('$')),
+                success,
+            })
+        }
         _ => None,
+    }
+}
+
+/// The result of a verifying function that means success, for a function that returns -1 on
+/// error.
+fn verifier_success(name: &Expr) -> Option<&'static str> {
+    if named_one_of(name, &["openssl_verify", "openssl_x509_verify"]) {
+        Some("1")
+    } else if named_one_of(name, &["openssl_pkcs7_verify", "ldap_compare"]) {
+        Some("true")
+    } else {
+        None
     }
 }
 

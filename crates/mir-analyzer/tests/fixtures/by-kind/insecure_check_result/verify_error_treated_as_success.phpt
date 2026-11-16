@@ -11,7 +11,7 @@ accept a signature that failed to verify.
 <?php
 function accept(string $data, string $signature, OpenSSLAsymmetricKey $key): bool {
     if (openssl_verify($data, $signature, $key)) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCheckResult: Insecure check: openssl_verify() returns -1 on error, which passes this check; compare with === 1
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCheckResult: Insecure check: openssl_verify() is -1 on error, which passes this check; compare with === 1
         return true;
     }
     return false;
@@ -19,12 +19,12 @@ function accept(string $data, string $signature, OpenSSLAsymmetricKey $key): boo
 
 function rejectInvalid(string $data, string $signature, OpenSSLAsymmetricKey $key): void {
     if (!openssl_verify($data, $signature, $key) && strlen($data) > 0) {
-//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCheckResult: Insecure check: openssl_verify() returns -1 on error, which passes this check; compare with === 1
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCheckResult: Insecure check: openssl_verify() is -1 on error, which passes this check; compare with === 1
         throw new RuntimeException('bad signature');
     }
 }
 
 function trusted(OpenSSLCertificate $cert, OpenSSLAsymmetricKey $key): bool {
     return openssl_x509_verify($cert, $key) != 0 ? true : false;
-//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCheckResult: Insecure check: openssl_x509_verify() returns -1 on error, which passes this check; compare with === 1
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCheckResult: Insecure check: openssl_x509_verify() is -1 on error, which passes this check; compare with === 1
 }

@@ -116,6 +116,10 @@ pub enum ValueOrigin {
     Decoded,
     /// A value a condition proved non-empty and truthy.
     NonEmpty,
+    /// An `openssl_verify()` or `openssl_x509_verify()` result: 1, 0, or -1 on error.
+    VerifyResult,
+    /// An `openssl_pkcs7_verify()` or `ldap_compare()` result: true, false, or -1 on error.
+    VerifyResultBool,
 }
 
 impl ValueOrigin {

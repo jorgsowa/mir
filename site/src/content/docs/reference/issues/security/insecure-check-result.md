@@ -22,4 +22,4 @@ if (openssl_verify($data, $signature, $publicKey)) { // InsecureCheckResult
 
 ## How to fix
 
-Compare with the success value: `openssl_verify($data, $signature, $publicKey) === 1`. For a deny-list match, use `preg_match(...) !== 0`.
+Compare with the success value: `openssl_verify($data, $signature, $publicKey) === 1`, and `=== true` for `openssl_pkcs7_verify()` and `ldap_compare()`, which return `true` on success. The same applies to a result stored in a variable first. For a deny-list match, use `preg_match(...) !== 0`.
