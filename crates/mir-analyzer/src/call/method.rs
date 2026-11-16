@@ -438,7 +438,7 @@ pub(crate) fn resolve_method_from_db(
             storage.template_params.clone()
         };
 
-        let throws: Arc<[Arc<str>]> = if storage.throws.is_empty() {
+        let throws: Arc<[Arc<str>]> = if storage.throws.is_empty() && !storage.throws_void {
             parent
                 .as_ref()
                 .map(|p| Arc::from(p.throws.as_slice()))
@@ -1938,31 +1938,8 @@ fn resolve_method_return<'a>(
                     ))
                 })
                 .unwrap_or(false);
-        for callee_throw in resolved.throws.iter() {
-            if crate::db::is_unchecked_exception(ea.db, callee_throw.as_ref()) {
-                continue;
-            }
-            let is_covered = |declared: &Arc<str>| {
-                declared.as_ref() == callee_throw.as_ref()
-                    || crate::db::extends_or_implements(
-                        ea.db,
-                        callee_throw.as_ref(),
-                        declared.as_ref(),
-                    )
-            };
-            if ctx.in_function_like
-                && !ctx.fn_declared_throws.iter().any(is_covered)
-                && !ctx.locally_caught_throws.iter().any(is_covered)
-                && !guarded_by_reflection_throws_guard
-            {
-                ea.emit(
-                    IssueKind::MissingThrowsDocblock {
-                        class: callee_throw.to_string(),
-                    },
-                    Severity::Info,
-                    span,
-                );
-            }
+        if !guarded_by_reflection_throws_guard {
+            super::check_callee_throws(ea, ctx, &resolved.throws, span, false);
         }
 
         // Write @param-out types back to caller variables for by-ref params.

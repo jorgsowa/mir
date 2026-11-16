@@ -811,6 +811,7 @@ impl CallAnalyzer {
                     span,
                 );
             }
+            super::check_callee_throws(ea, ctx, &resolved.throws, span, true);
             if resolved.is_internal || resolved.internal_scope.is_some() {
                 let calling_ns = ea.db.file_namespace(&ea.file);
                 let outside = match resolved.internal_scope.as_deref() {

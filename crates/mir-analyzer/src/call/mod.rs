@@ -25,6 +25,42 @@ pub(crate) use static_call::{
 
 pub struct CallAnalyzer;
 
+/// Reports exceptions a callee may throw that the caller neither catches nor declares.
+/// Unchecked exceptions only count under `@throws void`; `void_only` limits the check to that case.
+pub(crate) fn check_callee_throws(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    ctx: &crate::flow_state::FlowState,
+    callee_throws: &[std::sync::Arc<str>],
+    span: php_ast::Span,
+    void_only: bool,
+) {
+    if !ctx.in_function_like || (void_only && !ctx.fn_throws_void) {
+        return;
+    }
+    for callee_throw in callee_throws {
+        let is_covered = |declared: &std::sync::Arc<str>| {
+            declared.as_ref() == callee_throw.as_ref()
+                || crate::db::extends_or_implements(ea.db, callee_throw, declared)
+        };
+        if ctx.locally_caught_throws.iter().any(is_covered) {
+            continue;
+        }
+        if !ctx.fn_throws_void
+            && (crate::db::is_unchecked_exception(ea.db, callee_throw)
+                || ctx.fn_declared_throws.iter().any(is_covered))
+        {
+            continue;
+        }
+        ea.emit(
+            mir_issues::IssueKind::MissingThrowsDocblock {
+                class: callee_throw.to_string(),
+            },
+            mir_issues::Severity::Info,
+            span,
+        );
+    }
+}
+
 /// Whether an argument of type `ty` holds an object a callee could mutate.
 pub(crate) fn arg_object_is_mutable(db: &dyn crate::db::MirDatabase, ty: &mir_types::Type) -> bool {
     ty.types.iter().any(|atom| match atom {

@@ -379,6 +379,7 @@ impl DefinitionCollector<'_> {
             template_params,
             assertions,
             throws,
+            throws_void: doc.throws_void(),
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 // Only detect #[Deprecated] without arguments (no-arg form used in
                 // user code). Stubs use #[Deprecated(since: '...', ...)] with args

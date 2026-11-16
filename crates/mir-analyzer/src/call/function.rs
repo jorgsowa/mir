@@ -1803,31 +1803,7 @@ impl CallAnalyzer {
             // Check inter-procedural throws: if callee declares @throws, check if caller covers them.
             // Unchecked exceptions (RuntimeException / LogicException descendants) are skipped by
             // PHP convention — see [`is_unchecked_exception`].
-            for callee_throw in resolved.throws.iter() {
-                if crate::db::is_unchecked_exception(ea.db, callee_throw.as_ref()) {
-                    continue;
-                }
-                let is_covered = |declared: &Arc<str>| {
-                    declared.as_ref() == callee_throw.as_ref()
-                        || crate::db::extends_or_implements(
-                            ea.db,
-                            callee_throw.as_ref(),
-                            declared.as_ref(),
-                        )
-                };
-                if ctx.in_function_like
-                    && !ctx.fn_declared_throws.iter().any(is_covered)
-                    && !ctx.locally_caught_throws.iter().any(is_covered)
-                {
-                    ea.emit(
-                        IssueKind::MissingThrowsDocblock {
-                            class: callee_throw.to_string(),
-                        },
-                        Severity::Info,
-                        span,
-                    );
-                }
-            }
+            super::check_callee_throws(ea, ctx, &resolved.throws, span, false);
 
             ea.record_symbol(
                 call.name.span,

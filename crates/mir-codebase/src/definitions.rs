@@ -530,6 +530,9 @@ pub struct MethodDef {
     pub template_params: Vec<TemplateParam>,
     pub assertions: Vec<Assertion>,
     pub throws: Vec<Arc<str>>,
+    /// `@throws void`: the body must not let any exception escape.
+    #[serde(default)]
+    pub throws_void: bool,
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     /// `@psalm-internal Ns`: callers must be in `Ns` or below it.
@@ -1033,6 +1036,9 @@ pub struct FunctionDef {
     pub template_params: Vec<TemplateParam>,
     pub assertions: Vec<Assertion>,
     pub throws: Vec<Arc<str>>,
+    /// `@throws void`: the body must not let any exception escape.
+    #[serde(default)]
+    pub throws_void: bool,
     pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
     /// `@pure-unless-callable-is-impure`: pure when the callables passed to these parameters are.

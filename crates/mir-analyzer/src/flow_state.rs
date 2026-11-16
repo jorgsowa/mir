@@ -281,6 +281,9 @@ pub struct FlowState {
     /// Declared exception types for the current function/method (@throws).
     pub fn_declared_throws: Arc<[Arc<str>]>,
 
+    /// The current function/method declares `@throws void`.
+    pub fn_throws_void: bool,
+
     /// False in script scope, where there is no docblock to declare `@throws` in.
     pub in_function_like: bool,
 
@@ -850,6 +853,7 @@ impl FlowState {
             static_fqcn: None,
             fn_return_type: None,
             fn_declared_throws: Arc::from([]),
+            fn_throws_void: false,
             in_function_like: false,
             locally_caught_throws: Arc::from([]),
             inside_loop: false,
@@ -3514,6 +3518,7 @@ impl FlowState {
             static_fqcn,
             fn_return_type,
             fn_declared_throws,
+            fn_throws_void,
             in_function_like,
             locally_caught_throws,
             inside_finally,

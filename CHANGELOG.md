@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Report exceptions thrown or propagated in a function or method declared `@throws void` as MissingThrowsDocblock.
 - `InsecurePasswordHash` (MIR0815, warning): a `salt` option to `password_hash()` (ignored since PHP 8.0), a bcrypt `cost` below 10, and `password_hash()` of a raw binary digest, which bcrypt truncates at the first NUL byte.
 - `WeakCryptography` (MIR0816, warning): `openssl_encrypt()`/`openssl_decrypt()` with a literal cipher in ECB mode or from the DES, RC2, RC4 or Blowfish families, a key or non-empty IV written as a string literal, or `openssl_decrypt()` of a GCM, CCM, OCB or ChaCha20-Poly1305 cipher without the `tag` argument.
 - `InsecureSessionConfig` (MIR0817, warning): `ini_set()` or `session_start()` options that turn off `session.use_strict_mode`, `session.use_only_cookies` or `session.cookie_httponly`, or turn on `session.use_trans_sid`, and `session_id()` of a `$_GET`, `$_POST` or `$_REQUEST` value (session fixation).

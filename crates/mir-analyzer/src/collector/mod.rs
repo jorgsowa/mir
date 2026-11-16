@@ -2353,6 +2353,7 @@ impl<'a> DefinitionCollector<'a> {
                     template_params: vec![],
                     assertions: vec![],
                     throws: vec![],
+                    throws_void: false,
                     deprecated: None,
                     is_internal: false,
                     internal_scope: None,
@@ -3256,6 +3257,7 @@ impl<'a> DefinitionCollector<'a> {
             template_params,
             assertions,
             throws,
+            throws_void: doc.throws_void(),
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 if m.attributes
                     .iter()

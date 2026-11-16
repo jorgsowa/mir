@@ -1093,6 +1093,11 @@ pub struct ParsedDocblock {
 }
 
 impl ParsedDocblock {
+    /// `@throws void`: declares that nothing is thrown.
+    pub fn throws_void(&self) -> bool {
+        !self.throws.is_empty() && self.throws.iter().all(|t| t.eq_ignore_ascii_case("void"))
+    }
+
     pub fn taint_annotations(&self) -> Option<std::sync::Arc<mir_codebase::TaintAnnotations>> {
         if self.taint_source.is_empty()
             && self.taint_escape.is_empty()

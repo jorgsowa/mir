@@ -644,8 +644,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         };
                         if ctx.in_function_like
                             && !thrown_is_template_param
-                            && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
-                            && !ctx.fn_declared_throws.iter().any(throw_is_covered)
+                            && (ctx.fn_throws_void
+                                || (!crate::db::is_unchecked_exception(self.db, thrown_fqcn)
+                                    && !ctx.fn_declared_throws.iter().any(throw_is_covered)))
                             && !ctx.locally_caught_throws.iter().any(throw_is_covered)
                         {
                             let (line, line_end, col_start, col_end) =
@@ -716,8 +717,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         };
                         if ctx.in_function_like
                             && !thrown_is_template_param
-                            && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
-                            && !ctx.fn_declared_throws.iter().any(throw_is_covered)
+                            && (ctx.fn_throws_void
+                                || (!crate::db::is_unchecked_exception(self.db, thrown_fqcn)
+                                    && !ctx.fn_declared_throws.iter().any(throw_is_covered)))
                             && !ctx.locally_caught_throws.iter().any(throw_is_covered)
                         {
                             let (line, line_end, col_start, col_end) =

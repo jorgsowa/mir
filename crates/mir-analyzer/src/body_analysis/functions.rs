@@ -188,6 +188,7 @@ impl<'a> BodyAnalyzer<'a> {
             .as_ref()
             .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
+        ctx.fn_throws_void = resolved.as_ref().is_some_and(|(_, s)| s.throws_void);
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.summarize_taint);
         crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts, self.db, file);
@@ -773,6 +774,7 @@ impl<'a> BodyAnalyzer<'a> {
             true,
             Some(&template_params),
         );
+        ctx.fn_throws_void = resolved.as_ref().is_some_and(|(_, s)| s.throws_void);
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
 
         let mut buf = self.issue_buffer();
@@ -978,6 +980,7 @@ impl<'a> BodyAnalyzer<'a> {
             .as_ref()
             .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
+        ctx.fn_throws_void = resolved.as_ref().is_some_and(|(_, s)| s.throws_void);
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.summarize_taint);
         crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts, self.db, file);

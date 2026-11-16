@@ -303,7 +303,7 @@ fn method_chain_signature(
             storage.template_params.clone()
         };
 
-        let throws: Arc<[Arc<str>]> = if storage.throws.is_empty() {
+        let throws: Arc<[Arc<str>]> = if storage.throws.is_empty() && !storage.throws_void {
             parent
                 .as_ref()
                 .map(|p| Arc::from(p.throws.as_slice()))
