@@ -989,12 +989,7 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_docblock/`.
     InvalidDocblock { message: String },
-    /// A docblock type uses a leading `\` (the fully-qualified class
-    /// qualifier) with a non-class type keyword (`\int`, `\string`, …): a
-    /// pseudo-type is never a class, so the backslash makes no sense and the
-    /// spelling is not a fully qualified name.
-    /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
-    /// Fixtures: `tests/fixtures/by-kind/invalid_docblock_type/`.
+    /// A docblock type is invalid. Not currently emitted; kept for configuration compatibility.
     InvalidDocblockType { message: String },
     /// Emitted by `mir-analyzer/src/call/args/types.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_argument/`.

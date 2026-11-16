@@ -1005,36 +1005,6 @@ fn parse_backslash_qualified_keyword_stays_a_keyword() {
     );
 }
 
-#[test]
-fn backslash_keyword_members_records_spanned_offenders() {
-    let doc = super::DocblockParser::parse(
-        "/**\n * @param \\int|\\string $a\n * @return \\INT\n * @var \\non-empty-array<int> $b\n */",
-    );
-    let entries: Vec<(&str, &str)> = doc
-        .backslash_keyword_types
-        .iter()
-        .map(|o| (o.tag.as_str(), o.token.as_str()))
-        .collect();
-    assert_eq!(
-        entries,
-        vec![
-            ("param", r"\int"),
-            ("param", r"\string"),
-            ("return", r"\INT"),
-            ("var", r"\non-empty-array<int>"),
-        ]
-    );
-    // The first offender sits on the docblock's second line, at the type's
-    // own column (`\int` sits at column 10 of the docblock's second line).
-    assert_eq!(
-        (
-            doc.backslash_keyword_types[0].line,
-            doc.backslash_keyword_types[0].col
-        ),
-        (1, 10)
-    );
-}
-
 // ---------------------------------------------------------------------------
 // Tag descriptions
 // ---------------------------------------------------------------------------

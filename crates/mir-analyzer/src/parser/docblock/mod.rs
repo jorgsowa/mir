@@ -36,13 +36,6 @@ impl DocblockParser {
                 "param-out" | "psalm-param-out" | "phpstan-param-out" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "param-out",
-                                &ty_s,
-                                tag.span.start,
-                                text,
-                            );
                             if let Some(msg) = validate_type_str(&ty_s, "param-out") {
                                 result.invalid_annotations.push(msg);
                             } else {
@@ -71,13 +64,6 @@ impl DocblockParser {
                 "param" | "psalm-param" | "phpstan-param" | "phan-param" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "param",
-                                &ty_s,
-                                tag.span.start,
-                                text,
-                            );
                             // Check if the parsed type is valid
                             if is_inside_generics(&ty_s) {
                                 // For unclosed generics, report the full body for context
@@ -103,26 +89,12 @@ impl DocblockParser {
                         } else if let Some(msg) = validate_type_str(&body_str, "param") {
                             // If parsing failed, validate the full body to provide better error context
                             result.invalid_annotations.push(msg);
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "param",
-                                &body_str,
-                                tag.span.start,
-                                text,
-                            );
                         }
                     }
                 }
                 "return" | "psalm-return" | "phpstan-return" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let ty_s = extract_return_type(&body_str);
-                        record_backslash_keyword_types(
-                            &mut result,
-                            "return",
-                            &ty_s,
-                            tag.span.start,
-                            text,
-                        );
                         if let Some(msg) = validate_type_str(&ty_s, "return") {
                             result.invalid_annotations.push(msg);
                         }
@@ -138,13 +110,6 @@ impl DocblockParser {
                 "var" | "psalm-var" | "phpstan-var" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_s, name)) = parse_var_line(&body_str) {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "var",
-                                &ty_s,
-                                tag.span.start,
-                                text,
-                            );
                             if let Some(msg) = validate_type_str(&ty_s, "var") {
                                 result.invalid_annotations.push(msg);
                             }
@@ -158,13 +123,6 @@ impl DocblockParser {
                             // Stop at top-level whitespace to exclude description text that
                             // follows the type in multi-line @var bodies.
                             let ty_s = extract_type_prefix(body_str.trim());
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "var",
-                                ty_s,
-                                tag.span.start,
-                                text,
-                            );
                             if let Some(msg) = validate_type_str(ty_s, "var") {
                                 result.invalid_annotations.push(msg);
                             }
@@ -184,13 +142,6 @@ impl DocblockParser {
                         };
                         for class in first_word.split('|') {
                             if !class.is_empty() {
-                                record_backslash_keyword_types(
-                                    &mut result,
-                                    "throws",
-                                    class,
-                                    tag.span.start,
-                                    text,
-                                );
                                 if !result.throws.iter().any(|t| t == class) {
                                     result.throws.push(class.to_string());
                                 }
@@ -216,13 +167,6 @@ impl DocblockParser {
                             result.invalid_annotations.push(msg);
                         }
                         if let Some(b) = &bound {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "template",
-                                b,
-                                tag.span.start,
-                                text,
-                            );
                             if let Some(msg) = validate_type_str(b, "template") {
                                 result.invalid_annotations.push(msg);
                             }
@@ -250,13 +194,6 @@ impl DocblockParser {
                             result.invalid_annotations.push(msg);
                         }
                         if let Some(b) = &bound {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "template-covariant",
-                                b,
-                                tag.span.start,
-                                text,
-                            );
                             if let Some(msg) = validate_type_str(b, "template-covariant") {
                                 result.invalid_annotations.push(msg);
                             }
@@ -284,13 +221,6 @@ impl DocblockParser {
                             result.invalid_annotations.push(msg);
                         }
                         if let Some(b) = &bound {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "template-contravariant",
-                                b,
-                                tag.span.start,
-                                text,
-                            );
                             if let Some(msg) = validate_type_str(b, "template-contravariant") {
                                 result.invalid_annotations.push(msg);
                             }
@@ -311,13 +241,6 @@ impl DocblockParser {
                 "extends" | "template-extends" | "psalm-extends" | "phpstan-extends" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
-                        record_backslash_keyword_types(
-                            &mut result,
-                            "extends",
-                            trimmed,
-                            tag.span.start,
-                            text,
-                        );
                         if let Some(msg) = validate_type_str(trimmed, "extends") {
                             result.invalid_annotations.push(msg);
                         }
@@ -330,13 +253,6 @@ impl DocblockParser {
                 | "phpstan-implements" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
-                        record_backslash_keyword_types(
-                            &mut result,
-                            "implements",
-                            trimmed,
-                            tag.span.start,
-                            text,
-                        );
                         if let Some(msg) = validate_type_str(trimmed, "implements") {
                             result.invalid_annotations.push(msg);
                         }
@@ -346,13 +262,6 @@ impl DocblockParser {
                 "use" | "template-use" | "psalm-use" | "phpstan-use" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
-                        record_backslash_keyword_types(
-                            &mut result,
-                            "use",
-                            trimmed,
-                            tag.span.start,
-                            text,
-                        );
                         if let Some(msg) = validate_type_str(trimmed, "use") {
                             result.invalid_annotations.push(msg);
                         }
@@ -418,13 +327,6 @@ impl DocblockParser {
                 "property" | "psalm-property" | "phpstan-property" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "property",
-                                &ty_str,
-                                tag.span.start,
-                                text,
-                            );
                             result.push_property(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
@@ -438,13 +340,6 @@ impl DocblockParser {
                 "property-read" | "psalm-property-read" | "phpstan-property-read" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "property-read",
-                                &ty_str,
-                                tag.span.start,
-                                text,
-                            );
                             result.push_property(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
@@ -458,13 +353,6 @@ impl DocblockParser {
                 "property-write" | "psalm-property-write" | "phpstan-property-write" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "property-write",
-                                &ty_str,
-                                tag.span.start,
-                                text,
-                            );
                             result.push_property(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
@@ -484,22 +372,6 @@ impl DocblockParser {
                         result.invalid_annotations.push(err);
                     } else if let Some(mut m) = parse_method_line(&body_str) {
                         m.tag_span = tag_head_span(text, tag.span.start, tag.span.end);
-                        for p in &m.params {
-                            record_backslash_keyword_types(
-                                &mut result,
-                                "method",
-                                &p.type_hint,
-                                tag.span.start,
-                                text,
-                            );
-                        }
-                        record_backslash_keyword_types(
-                            &mut result,
-                            "method",
-                            &m.return_type,
-                            tag.span.start,
-                            text,
-                        );
                         result
                             .methods
                             .retain(|prev| !prev.name.eq_ignore_ascii_case(&m.name));
@@ -781,57 +653,6 @@ fn parse_flow_to_return(body: &str) -> Option<Vec<String>> {
     )
 }
 
-/// Record the backslash-qualified non-class (`\int`) members of a docblock
-/// type spelling in `result` — the collector turns each into an
-/// `InvalidDocblockType` warning anchored at the token's own source line.
-fn record_backslash_keyword_types(
-    result: &mut ParsedDocblock,
-    tag_name: &str,
-    ty: &str,
-    tag_start: u32,
-    text: &str,
-) {
-    for token in backslash_keyword_members(ty) {
-        let (line, col) = token_line_col(text, tag_start, ty, &token);
-        result.backslash_keyword_types.push(BackslashKeywordType {
-            tag: tag_name.to_string(),
-            token,
-            line,
-            col,
-        });
-    }
-}
-
-/// 0-based `(line, col)` of `token` within the docblock `text`. `token` is a
-/// verbatim member of `ty`, which sits in the tag body that follows `@tag`;
-/// it is located relative to `tag_start` (the tag's offset in the text).
-/// Falls back to the tag start when the token cannot be found.
-fn token_line_col(text: &str, tag_start: u32, ty: &str, token: &str) -> (u32, u32) {
-    let start = (tag_start as usize).min(text.len());
-    let mut abs = start;
-    if let Some(rest) = text.get(abs..) {
-        if let Some(ty_off) = rest.find(ty) {
-            if let Some(ty_text) = text.get(abs + ty_off..) {
-                if let Some(tok_off) = ty_text.find(token) {
-                    abs = (abs + ty_off + tok_off).min(text.len());
-                }
-            }
-        }
-    }
-    let mut line = 0u32;
-    let mut line_start = 0usize;
-    for (i, b) in text.bytes().enumerate() {
-        if i >= abs {
-            break;
-        }
-        if b == b'\n' {
-            line += 1;
-            line_start = i + 1;
-        }
-    }
-    (line, (abs - line_start) as u32)
-}
-
 /// `self<T>`/`static<T>`/`parent<T>`/`$this<T>` written in a self-out
 /// annotation (`@psalm-self-out`, `@phpstan-self-out`, `@psalm-this-out`)
 /// needs its `<T>` kept intact for method-level template substitution (e.g.
@@ -915,22 +736,6 @@ pub struct DocMethodParam {
 pub struct DocTypeAlias {
     pub name: String,
     pub type_expr: String,
-}
-
-/// A docblock type token written with a leading `\` (the fully-qualified
-/// class qualifier) on a non-class type keyword (`\int`, `?\string`, …).
-/// `line`/`col` are 0-based positions within the docblock text, so the
-/// collector can anchor the warning at the token's own source line.
-#[derive(Debug, Clone)]
-pub struct BackslashKeywordType {
-    /// The annotation tag carrying the type (`param`, `return`, `var`, …).
-    pub tag: String,
-    /// The offending type token, verbatim with its leading backslash.
-    pub token: String,
-    /// Line of the token within the docblock text.
-    pub line: u32,
-    /// Column of the token within its docblock-text line.
-    pub col: u32,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1065,11 +870,6 @@ pub struct ParsedDocblock {
     pub invalid_annotations: Vec<String>,
     /// Byte range within the docblock text of the tag behind each `invalid_annotations` entry.
     pub invalid_annotation_spans: Vec<(u32, u32)>,
-    /// Docblock type spellings that use a leading `\` (the fully-qualified
-    /// class qualifier) on a non-class type keyword (`\int`, `?\string`, …);
-    /// the collector emits an `InvalidDocblockType` warning for each, anchored
-    /// at the token's own line.
-    pub backslash_keyword_types: Vec<BackslashKeywordType>,
     /// `@mir-check EXPR is TYPE` — (expr_text, type_string). `expr_text` is
     /// kept verbatim (e.g. `$h->status`, `self::$prop`, `$arr['key']`) and
     /// parsed as a real PHP expression by the consumer, not just a bare
