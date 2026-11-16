@@ -991,11 +991,6 @@
       <code><![CDATA[return $categories;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Lock/LockBackendAbstract.php">
-    <InvalidArgument>
-      <code><![CDATA[$sleep]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/lib/Drupal/Core/Lock/NullLockBackend.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -1264,9 +1259,6 @@
     <InvalidCast>
       <code><![CDATA[$container->getParameter('app.root')]]></code>
     </InvalidCast>
-    <InvalidReturnType>
-      <code><![CDATA[return $summaries;]]></code>
-    </InvalidReturnType>
     <UndefinedClass>
       <code><![CDATA[DeprecationHandler]]></code>
     </UndefinedClass>
