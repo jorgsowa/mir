@@ -677,9 +677,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Sql/SqlContentEntityStorage.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $items_by_entity;]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $entity->getRevisionId();]]></code>
     </NullableReturnStatement>

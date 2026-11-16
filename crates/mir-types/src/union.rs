@@ -153,9 +153,10 @@ pub(crate) fn combine_generic_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
     })
 }
 
-/// Whether generic array `sub` adds nothing to `sup` of the same kind: its key and
-/// value fit. `mixed` and templates fit anything structurally, so they never count.
-fn generic_array_covered(sub: &Atomic, sup: &Atomic) -> bool {
+/// Whether array `sub` adds nothing to `sup` of the same kind: its key and value fit, or
+/// for shapes, the same keys with fitting values. `mixed` and templates fit anything
+/// structurally, so they only cover themselves.
+fn array_covered(sub: &Atomic, sup: &Atomic) -> bool {
     fn parts(a: &Atomic) -> Option<(Option<&Type>, &Type)> {
         match a {
             Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
@@ -165,14 +166,37 @@ fn generic_array_covered(sub: &Atomic, sup: &Atomic) -> bool {
             _ => None,
         }
     }
-    let opaque = |t: &Type| {
-        t.types
-            .iter()
-            .any(|a| matches!(a, Atomic::TMixed | Atomic::TTemplateParam { .. }))
+    let fits = |x: &Type, y: &Type| {
+        values_covered(x, y) || (!is_opaque(x) && !is_opaque(y) && x.is_subtype_structural(y))
     };
-    let fits = |x: &Type, y: &Type| !opaque(x) && !opaque(y) && x.is_subtype_structural(y);
     if std::mem::discriminant(sub) != std::mem::discriminant(sup) {
         return false;
+    }
+    if let (
+        Atomic::TKeyedArray {
+            properties: pa,
+            is_open: oa,
+            is_list: la,
+        },
+        Atomic::TKeyedArray {
+            properties: pb,
+            is_open: ob,
+            is_list: lb,
+        },
+    ) = (sub, sup)
+    {
+        return oa == ob
+            && la == lb
+            && pa.len() == pb.len()
+            && pa.iter().all(|(key, x)| {
+                pb.get(key)
+                    .is_some_and(|y| x.optional == y.optional && values_covered(&x.ty, &y.ty))
+            })
+            && match (&pa.remainder, &pb.remainder) {
+                (None, None) => true,
+                (Some(a), Some(b)) => values_covered(a, b),
+                _ => false,
+            };
     }
     match (parts(sub), parts(sup)) {
         (Some((sub_key, sub_value)), Some((sup_key, sup_value))) => {
@@ -184,6 +208,32 @@ fn generic_array_covered(sub: &Atomic, sup: &Atomic) -> bool {
         }
         _ => false,
     }
+}
+
+/// Whether every member of `x` is in `y`, is an array `y` covers, or is a scalar literal
+/// or refinement of a `y` member; an int never fits a float. `mixed` and templates only
+/// cover themselves.
+fn values_covered(x: &Type, y: &Type) -> bool {
+    if is_opaque(x) || is_opaque(y) {
+        return x == y;
+    }
+    x.types.iter().all(|a| {
+        let scalar_refinement =
+            !matches!(a, Atomic::TKeyedArray { .. }) && crate::generalize::is_generalizable(a);
+        y.types.iter().any(|b| {
+            a == b
+                || array_covered(a, b)
+                || (scalar_refinement
+                    && !(a.is_int() && matches!(b, Atomic::TFloat))
+                    && atomic_subtype(a, b))
+        })
+    })
+}
+
+fn is_opaque(t: &Type) -> bool {
+    t.types
+        .iter()
+        .any(|a| matches!(a, Atomic::TMixed | Atomic::TTemplateParam { .. }))
 }
 
 /// One shape covering `a | b`: keys of both, with those set on one side only
@@ -517,12 +567,12 @@ impl Type {
             }
         }
 
-        // A generic array covered by another of its kind adds nothing; one it
-        // covers is dropped (`list<0> | list<int>` is `list<int>`).
-        if self.types.iter().any(|t| generic_array_covered(&atomic, t)) {
+        // An array covered by another of its kind adds nothing; one it covers is
+        // dropped (`list<0> | list<int>` is `list<int>`, `array{a: 0} | array{a: int}` is `array{a: int}`).
+        if self.types.iter().any(|t| array_covered(&atomic, t)) {
             return;
         }
-        self.types.retain(|t| !generic_array_covered(t, &atomic));
+        self.types.retain(|t| !array_covered(t, &atomic));
 
         if matches!(
             atomic,
@@ -4450,6 +4500,46 @@ mod tests {
         });
         kinds.add_type(list(Atomic::TInt));
         assert_eq!(kinds.types.len(), 2);
+    }
+
+    #[test]
+    fn add_type_drops_shapes_another_covers() {
+        let mut ty = Type::single(shape(&[("a", Atomic::TLiteralInt(1), false)], false));
+        ty.add_type(shape(&[("a", Atomic::TInt, false)], false));
+        assert_eq!(
+            ty.types.as_slice(),
+            &[shape(&[("a", Atomic::TInt, false)], false)]
+        );
+
+        let kept = |a: Atomic, b: Atomic| {
+            let mut ty = Type::single(a);
+            ty.add_type(b);
+            ty.types.len() == 2
+        };
+        let int_shape = shape(&[("a", Atomic::TLiteralInt(1), false)], false);
+        assert!(kept(
+            int_shape.clone(),
+            shape(&[("a", Atomic::TFloat, false)], false)
+        ));
+        assert!(kept(
+            int_shape.clone(),
+            shape(&[("a", Atomic::TMixed, false)], false)
+        ));
+        assert!(kept(
+            int_shape.clone(),
+            shape(&[("a", Atomic::TInt, true)], false)
+        ));
+        assert!(kept(
+            int_shape.clone(),
+            shape(&[("a", Atomic::TInt, false)], true)
+        ));
+        assert!(kept(
+            int_shape,
+            shape(
+                &[("a", Atomic::TInt, false), ("b", Atomic::TInt, false)],
+                false
+            )
+        ));
     }
 
     #[test]
