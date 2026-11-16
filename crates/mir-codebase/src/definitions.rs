@@ -803,6 +803,9 @@ pub struct ClassDef {
     /// `@psalm-consistent-constructor`: subclass constructors must match this class's.
     #[serde(default)]
     pub consistent_constructor: bool,
+    /// `@psalm-yield T`: the value `yield $object` evaluates to.
+    #[serde(default)]
+    pub yield_type: Option<Type>,
     /// `@phpstan-sealed A|B` / `@psalm-inheritors A|B`: the only classes that may extend this one.
     #[serde(default)]
     pub sealed: Vec<Arc<str>>,
@@ -912,6 +915,9 @@ pub struct InterfaceDef {
     /// `@phpstan-require-extends Cls`: implementing classes must extend `Cls`.
     #[serde(default)]
     pub require_extends: Vec<Arc<str>>,
+    /// `@psalm-yield T`: the value `yield $object` evaluates to.
+    #[serde(default)]
+    pub yield_type: Option<Type>,
 }
 
 // ---------------------------------------------------------------------------

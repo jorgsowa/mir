@@ -323,6 +323,14 @@ impl<'a> DefinitionCollector<'a> {
             &template_params,
         );
         let seal_properties = iface_doc.seal_properties;
+        let yield_type = iface_doc.yield_type.clone().map(|ty| {
+            self.resolve_union_doc_with_templates(
+                super::expand_aliases_only(ty, &type_aliases),
+                &iface_template_names,
+                &fqcn,
+                &iface_template_params,
+            )
+        });
         super::add_implicit_stringable(&mut extends, &own_methods, &fqcn);
 
         self.slice
@@ -354,6 +362,7 @@ impl<'a> DefinitionCollector<'a> {
                     .iter()
                     .map(|c| self.resolve_type_name(c.as_str(), true).into())
                     .collect(),
+                yield_type,
             }));
 
         self.own_constants = prev_own_constants;

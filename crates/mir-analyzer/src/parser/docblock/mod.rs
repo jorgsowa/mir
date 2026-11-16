@@ -395,6 +395,14 @@ impl DocblockParser {
                         }
                     }
                 }
+                "psalm-yield" => {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
+                        let ty_s = extract_return_type(&body_str);
+                        if !ty_s.is_empty() && validate_type_str(&ty_s, "psalm-yield").is_none() {
+                            result.yield_type = Some(parse_type_string(&ty_s));
+                        }
+                    }
+                }
                 "since" if result.since.is_none() => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let v = body_str.split_whitespace().next().unwrap_or("");
@@ -813,6 +821,8 @@ pub struct ParsedDocblock {
     pub internal_scope: Option<String>,
     /// `@psalm-consistent-constructor` on a class.
     pub consistent_constructor: bool,
+    /// `@psalm-yield T` on a class: the value `yield $object` evaluates to.
+    pub yield_type: Option<Type>,
     /// `@phpstan-sealed A|B` / `@psalm-inheritors A|B`.
     pub sealed: Vec<String>,
     pub is_pure: bool,

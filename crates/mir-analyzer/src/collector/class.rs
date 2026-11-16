@@ -666,6 +666,14 @@ impl<'a> DefinitionCollector<'a> {
             .collect();
 
         super::add_implicit_stringable(&mut interfaces, &own_methods, &fqcn);
+        let yield_type = class_doc.yield_type.clone().map(|ty| {
+            self.resolve_union_doc_with_templates(
+                super::expand_aliases_only(ty, &type_aliases),
+                &class_template_names,
+                &fqcn,
+                &template_params,
+            )
+        });
 
         let storage = ClassDef {
             fqcn: fqcn.clone().into(),
@@ -713,6 +721,7 @@ impl<'a> DefinitionCollector<'a> {
             is_internal: class_doc.is_internal,
             internal_scope: class_doc.internal_scope.as_deref().map(Arc::from),
             consistent_constructor: class_doc.consistent_constructor,
+            yield_type,
             sealed: class_doc
                 .sealed
                 .iter()

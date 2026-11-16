@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `$x = yield $obj` is typed from the `@psalm-yield` of `$obj`'s class or an ancestor.
 - `@psalm-assert-if-true Type $this->method()` narrows the call result in the caller, and methods of `@psalm-immutable` classes have memoized call results.
 - Treat exceptions thrown by a closure passed to a `@param-immediately-invoked-callable` parameter as thrown at the call site.
 - Report exceptions thrown or propagated in a function or method declared `@throws void` as MissingThrowsDocblock.

@@ -606,6 +606,15 @@ impl ClassLike {
         }
     }
 
+    /// `@psalm-yield T` (class or interface).
+    pub fn yield_type(&self) -> Option<&mir_types::Type> {
+        match self {
+            ClassLike::Class(c) => c.yield_type.as_ref(),
+            ClassLike::Interface(i) => i.yield_type.as_ref(),
+            _ => None,
+        }
+    }
+
     /// `@use TraitName<T1, T2>` type args (class, trait, or enum — anything
     /// that can `use` a trait).
     pub fn trait_use_type_args(&self) -> &[(Arc<str>, Vec<mir_types::Type>)] {

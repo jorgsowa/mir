@@ -28,6 +28,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         // `Generator<TKey, TValue, TSend, TReturn>`. `yield from $iterable`
         // has no explicit key/value sub-expressions — its contribution comes
         // from the delegated iterable's own key/value types instead.
+        let sent_ty = value_ty
+            .as_ref()
+            .filter(|_| !y.is_from)
+            .and_then(|ty| self.declared_yield_type(ty));
         let (contributed_key, contributed_value) = if y.is_from {
             value_ty
                 .as_ref()
@@ -45,8 +49,50 @@ impl<'a> ExpressionAnalyzer<'a> {
         // The value of a `yield` expression itself is whatever a future
         // `Generator::send()` call provides — mir does not infer that from
         // usage, so it stays `mixed` (also mir's `TSend` for the inferred
-        // `Generator<K, V, TSend, R>`).
-        Type::mixed()
+        // `Generator<K, V, TSend, R>`), unless the yielded object's class
+        // declares `@psalm-yield`.
+        sent_ty.unwrap_or_else(Type::mixed)
+    }
+
+    /// The `@psalm-yield` type of a single yielded object's class or nearest declaring
+    /// ancestor, resolved against the object's template args; `None` if unresolved.
+    fn declared_yield_type(&self, yielded: &Type) -> Option<Type> {
+        let [Atomic::TNamedObject { fqcn, type_params }] = yielded.types.as_slice() else {
+            return None;
+        };
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        let (owner, yield_ty) = crate::db::class_ancestors_by_fqcn(self.db, here)
+            .iter()
+            .find_map(|ancestor| {
+                let class = crate::db::find_class_like(
+                    self.db,
+                    crate::db::Fqcn::from_str(self.db, ancestor.as_ref()),
+                )?;
+                Some((ancestor.clone(), class.yield_type()?.clone()))
+            })?;
+        let own_params = crate::db::class_template_params(self.db, fqcn.as_ref());
+        let own_bindings = crate::generic::build_class_bindings(
+            own_params.as_deref().unwrap_or_default(),
+            type_params,
+        );
+        let mut bindings = if owner.eq_ignore_ascii_case(fqcn.as_ref()) {
+            own_bindings
+        } else {
+            crate::db::template_bindings_for_ancestor(
+                self.db,
+                fqcn.as_ref(),
+                &own_bindings,
+                owner.as_ref(),
+            )
+            .unwrap_or_default()
+        };
+        for tp in crate::db::class_template_params(self.db, owner.as_ref())
+            .iter()
+            .flat_map(|tps| tps.iter())
+        {
+            bindings.entry(tp.name).or_insert_with(Type::mixed);
+        }
+        Some(yield_ty.substitute_templates(&bindings))
     }
 
     fn check_yield_from_iterable(&mut self, ty: &Type, span: php_ast::Span) {
