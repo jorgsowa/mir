@@ -14,6 +14,9 @@ impl<'a> ClassAnalyzer<'a> {
         let version = crate::db::db_php_version(self.db);
         let override_checked = version >= crate::php_version::PhpVersion::new(8, 3);
         let property_override_checked = version >= crate::php_version::PhpVersion::new(8, 5);
+        if version >= crate::php_version::PhpVersion::new(8, 6) {
+            self.check_constant_override_attributes(fqcn, &class, here, issues);
+        }
         let own_methods: Vec<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)> = class
             .own_methods()
             .iter()
@@ -1218,6 +1221,77 @@ impl<'a> ClassAnalyzer<'a> {
 
     /// Both properties' types when at least one comes from `@var`, their native hints agree,
     /// and neither involves templates, late-static types or unknown classes.
+    /// `#[\Override]` on a class constant or enum case needs a non-private constant of that name in a parent or interface.
+    fn check_constant_override_attributes(
+        &self,
+        fqcn: &Arc<str>,
+        class: &crate::db::ClassLike,
+        here: crate::db::Fqcn<'_>,
+        issues: &mut Vec<Issue>,
+    ) {
+        // Trait constants are checked in each using class, which mir doesn't flatten.
+        if matches!(class, crate::db::ClassLike::Trait(_)) {
+            return;
+        }
+        let mut overrides: Vec<(Arc<str>, Option<Location>)> = class
+            .own_constants()
+            .values()
+            .filter(|c| c.is_override)
+            .map(|c| (c.name.clone(), c.location.clone()))
+            .collect();
+        if let crate::db::ClassLike::Enum(e) = class {
+            overrides.extend(
+                e.cases
+                    .values()
+                    .filter(|c| c.is_override)
+                    .map(|c| (c.name.clone(), c.location.clone())),
+            );
+        }
+        if overrides.is_empty() {
+            return;
+        }
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        let ancestors: Vec<crate::db::Fqcn<'_>> = ancestors
+            .iter()
+            .skip(1)
+            .map(|anc| crate::db::Fqcn::from_str(self.db, anc.as_ref()))
+            .collect();
+        // An unknown parent or interface may declare the constant.
+        if ancestors
+            .iter()
+            .any(|anc| crate::db::find_class_like(self.db, *anc).is_none())
+        {
+            return;
+        }
+        for (name, location) in overrides {
+            let has_parent = ancestors.iter().any(|anc| {
+                crate::db::find_class_like(self.db, *anc)
+                    .is_some_and(|c| !matches!(c, crate::db::ClassLike::Trait(_)))
+                    && crate::db::find_class_constant_in_class(self.db, *anc, name.as_ref())
+                        .is_some_and(|c| c.visibility != Some(Visibility::Private))
+            });
+            if has_parent {
+                continue;
+            }
+            let mut issue = Issue::new(
+                IssueKind::InvalidOverride {
+                    class: fqcn.to_string(),
+                    member: name.to_string(),
+                },
+                issue_location(
+                    location.as_ref(),
+                    location
+                        .as_ref()
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                ),
+            );
+            if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                issue = issue.with_snippet(snippet);
+            }
+            issues.push(issue);
+        }
+    }
+
     fn docblock_property_types<'p>(
         &self,
         own: &'p mir_codebase::definitions::PropertyDef,

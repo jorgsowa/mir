@@ -2683,8 +2683,10 @@ impl IssueKind {
             IssueKind::InvalidOverride { class, member } => {
                 let kind = if member.starts_with('$') {
                     "property"
-                } else {
+                } else if member.ends_with("()") {
                     "method"
+                } else {
+                    "constant"
                 };
                 format!(
                     "{class}::{member} has #[\\Override] attribute, but no matching parent {kind} exists"

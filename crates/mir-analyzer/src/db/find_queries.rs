@@ -1504,6 +1504,7 @@ pub fn find_class_constant_in_class<'db>(
                 is_final: false,
                 location: case.location.clone(),
                 deprecated: case.deprecated.clone(),
+                is_override: case.is_override,
             });
         }
     }

@@ -219,6 +219,7 @@ impl<'a> DefinitionCollector<'a> {
                                 .map(|v| Self::convert_visibility(Some(v))),
                             is_final: c.modifiers.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
+                            is_override: self.has_override_attribute(&c.attributes),
                             deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
                                 || {
                                     if c.attributes.iter().any(|a| {

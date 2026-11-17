@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- From PHP 8.6, report `#[\Override]` on a class constant or enum case without a public or protected constant of that name in a parent class or interface as InvalidOverride.
 - Report a subclass of a `@psalm-consistent-templates` class that doesn't pass the parent's templates through unchanged, as InvalidExtendClass.
 - `$x = yield $obj` is typed from the `@psalm-yield` of `$obj`'s class or an ancestor.
 - `@psalm-assert-if-true Type $this->method()` narrows the call result in the caller, and methods of `@psalm-immutable` classes have memoized call results.

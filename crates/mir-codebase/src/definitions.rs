@@ -757,6 +757,9 @@ pub struct ConstantDef {
     /// `@deprecated` docblock annotation, if present.
     #[serde(default)]
     pub deprecated: Option<Arc<str>>,
+    /// Marked `#[\Override]`.
+    #[serde(default)]
+    pub is_override: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -980,6 +983,9 @@ pub struct EnumCaseDef {
     /// `@deprecated` docblock annotation, if present.
     #[serde(default)]
     pub deprecated: Option<Arc<str>>,
+    /// Marked `#[\Override]`.
+    #[serde(default)]
+    pub is_override: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
