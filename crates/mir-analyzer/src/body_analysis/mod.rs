@@ -1297,8 +1297,10 @@ impl<'a> BodyAnalyzer<'a> {
 }
 
 mod aggregates;
+pub(crate) use deprecated_syntax::check_deprecated_syntax;
 pub(crate) mod class_like_plugins;
 mod classes;
+mod deprecated_syntax;
 mod functions;
 mod orchestration;
 pub(crate) use orchestration::accumulate_class_exists_guard;

@@ -217,6 +217,7 @@ issues keep their code.
 | MIR1012  | OptionalParameterBeforeRequired | [other/optional-parameter-before-required](../other/optional-parameter-before-required/) |
 | MIR1013  | ImplicitlyNullableParameter   | [other/implicitly-nullable-parameter](../other/implicitly-nullable-parameter/) |
 | MIR1014  | DynamicPropertyCreation       | [other/dynamic-property-creation](../other/dynamic-property-creation/) |
+| MIR1015  | DeprecatedSyntax              | [other/deprecated-syntax](../other/deprecated-syntax/) |
 | MIR1100  | MissingReturnType             | [other/missing-return-type](../other/missing-return-type/) |
 | MIR1101  | MissingParamType              | [other/missing-param-type](../other/missing-param-type/) |
 | MIR1102  | MissingThrowsDocblock         | [other/missing-throws-docblock](../other/missing-throws-docblock/) |

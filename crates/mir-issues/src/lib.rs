@@ -906,6 +906,10 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/implicitly_nullable_parameter/`.
     ImplicitlyNullableParameter { message: String },
+    /// A declaration or statement form PHP deprecates at compile time, with PHP's message.
+    /// Emitted by `mir-analyzer/src/body_analysis/deprecated_syntax.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_syntax/`.
+    DeprecatedSyntax { message: String },
     /// A write creates an undeclared property, which PHP deprecates from 8.2.
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
     /// Fixtures: `tests/fixtures/by-kind/dynamic_property_creation/`.
@@ -1373,6 +1377,7 @@ impl IssueKind {
             | IssueKind::DeprecatedConstant { .. }
             | IssueKind::OptionalParameterBeforeRequired { .. }
             | IssueKind::ImplicitlyNullableParameter { .. }
+            | IssueKind::DeprecatedSyntax { .. }
             | IssueKind::DynamicPropertyCreation { .. }
             | IssueKind::DeprecatedInterface { .. }
             | IssueKind::DeprecatedTrait { .. }
@@ -1666,6 +1671,7 @@ impl IssueKind {
             IssueKind::OptionalParameterBeforeRequired { .. } => "MIR1012",
             IssueKind::ImplicitlyNullableParameter { .. } => "MIR1013",
             IssueKind::DynamicPropertyCreation { .. } => "MIR1014",
+            IssueKind::DeprecatedSyntax { .. } => "MIR1015",
 
             // Missing types / docblocks (1100-1199)
             IssueKind::MissingReturnType { .. } => "MIR1100",
@@ -1762,13 +1768,12 @@ impl IssueKind {
             | "MIR0502" | "MIR0503" | "MIR0504" | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0509"
             | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003" | "MIR1004" | "MIR1005"
             | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010" | "MIR1011" | "MIR1012"
-            | "MIR1013" | "MIR1014" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104"
-            | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
-            | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
-            | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
-            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" | "MIR0237" | "MIR0110" => {
-                Some(Severity::Info)
-            }
+            | "MIR1013" | "MIR1014" | "MIR1015" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103"
+            | "MIR1104" | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204"
+            | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504"
+            | "MIR1505" | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226"
+            | "MIR0227" | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" | "MIR0237"
+            | "MIR0110" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1981,6 +1986,7 @@ impl IssueKind {
             IssueKind::InternalMethod { .. } => "InternalMethod",
             IssueKind::OptionalParameterBeforeRequired { .. } => "OptionalParameterBeforeRequired",
             IssueKind::ImplicitlyNullableParameter { .. } => "ImplicitlyNullableParameter",
+            IssueKind::DeprecatedSyntax { .. } => "DeprecatedSyntax",
             IssueKind::DynamicPropertyCreation { .. } => "DynamicPropertyCreation",
             IssueKind::MissingReturnType { .. } => "MissingReturnType",
             IssueKind::MissingClosureReturnType => "MissingClosureReturnType",
@@ -2772,7 +2778,8 @@ impl IssueKind {
                 append_deprecation_message(base, message)
             }
             IssueKind::OptionalParameterBeforeRequired { message }
-            | IssueKind::ImplicitlyNullableParameter { message } => message.clone(),
+            | IssueKind::ImplicitlyNullableParameter { message }
+            | IssueKind::DeprecatedSyntax { message } => message.clone(),
             IssueKind::DeprecatedInterface { name, message } => {
                 let base = format!("Interface {name} is deprecated");
                 append_deprecation_message(base, message)
@@ -3640,6 +3647,7 @@ mod code_tests {
             },
             IssueKind::OptionalParameterBeforeRequired { message: s() },
             IssueKind::ImplicitlyNullableParameter { message: s() },
+            IssueKind::DeprecatedSyntax { message: s() },
             IssueKind::DeprecatedInterface {
                 name: s(),
                 message: None,
@@ -3818,6 +3826,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 223);
+        assert_eq!(one_of_each().len(), 224);
     }
 }
