@@ -1,4 +1,4 @@
-//! Calls of built-in functions in a form PHP 8.6 deprecates.
+//! Calls of built-in functions in a form PHP 8.6 deprecates, reported for every target version.
 
 use mir_issues::{IssueKind, Severity};
 use mir_types::Type;
@@ -8,7 +8,6 @@ use php_ast::Span;
 use crate::ast_ext::ByteStringExt as _;
 
 use crate::expr::ExpressionAnalyzer;
-use crate::php_version::PhpVersion;
 
 /// The argument bound to parameter `name` at position `pos`, with its index in `args`.
 fn arg_at<'a>(args: &'a [Arg], pos: usize, name: &str) -> Option<(usize, &'a Expr)> {
@@ -71,9 +70,7 @@ impl ExpressionAnalyzer<'_> {
         arg_types: &[Type],
         span: Span,
     ) {
-        if self.php_version < PhpVersion::new(8, 6)
-            || args.iter().any(|a| !matches!(a.kind, ArgKind::Value(_)))
-        {
+        if args.iter().any(|a| !matches!(a.kind, ArgKind::Value(_))) {
             return;
         }
         match fn_name_lower {

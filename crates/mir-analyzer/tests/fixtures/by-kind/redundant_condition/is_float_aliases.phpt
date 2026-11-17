@@ -18,6 +18,7 @@ function testIsFloat($x) {
 
 function testIsDouble($x) {
     if (is_double($x)) {
+//      ^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function is_double
         return $x * 2.0;
     }
 }

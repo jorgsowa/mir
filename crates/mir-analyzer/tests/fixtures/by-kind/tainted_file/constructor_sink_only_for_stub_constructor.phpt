@@ -21,6 +21,7 @@ class CsvReader extends SplFileObject {
     public function __construct(string $delimiter) {
         parent::__construct('/var/data/fixed.csv');
         $this->setCsvControl($delimiter);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedMethod: Method CsvReader::setCsvControl() is deprecated
     }
 }
 

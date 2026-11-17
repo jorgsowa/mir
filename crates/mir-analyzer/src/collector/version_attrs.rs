@@ -65,15 +65,6 @@ fn arg_value<'a>(args: &'a [Arg], pos: usize, name: &str) -> Option<&'a Expr> {
 }
 
 /// Read a string-literal argument (positional `pos` or named `name`).
-/// A string argument passed by name, such as `since:` of `#[Deprecated]`.
-pub(super) fn named_string_arg(attr: &Attribute, name: &str) -> Option<String> {
-    let value = attr.args.iter().find(|a| arg_name_is(a, name))?.value()?;
-    match &value.kind {
-        ExprKind::String(s) => Some(s.as_str().to_string()),
-        _ => None,
-    }
-}
-
 fn string_arg(args: &[Arg], pos: usize, name: &str) -> Option<String> {
     match arg_value(args, pos, name).map(|e| &e.kind) {
         Some(ExprKind::String(s)) => Some(s.as_str().to_string()),

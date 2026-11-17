@@ -5,27 +5,23 @@ use std::sync::Arc;
 
 use mir_issues::{Issue, IssueKind};
 use php_ast::ast::UseKind;
-use php_ast::owned::visitor::{walk_owned_class_member, walk_owned_enum_member, OwnedVisitor};
+use php_ast::owned::visitor::{
+    walk_owned_class_member, walk_owned_enum_member, walk_owned_property_hook, OwnedVisitor,
+};
 use php_ast::owned::{
     Block, ClassMember, ClassMemberKind, EnumMember, EnumMemberKind, Expr, ExprKind, MethodDecl,
-    Stmt, StmtKind, TypeHint, TypeHintKind,
+    PropertyHook, Stmt, StmtKind, TypeHint, TypeHintKind,
 };
 use php_ast::Span;
 
-use crate::php_version::PhpVersion;
-
-/// Reports PHP 8.6's compile-time deprecations in every declaration of `stmts`.
+/// Reports PHP 8.6's compile-time deprecations in every declaration of `stmts`, whatever the target version.
 pub(crate) fn check_deprecated_syntax(
     stmts: &[Stmt],
-    php_version: PhpVersion,
     file: &Arc<str>,
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut Vec<Issue>,
 ) {
-    if php_version < PhpVersion::new(8, 6) {
-        return;
-    }
     let mut visitor = DeprecatedSyntaxVisitor {
         file,
         source,
@@ -360,6 +356,10 @@ impl OwnedVisitor for DeprecatedSyntaxVisitor<'_> {
             _ => {}
         }
         walk_owned_enum_member(self, member)
+    }
+
+    fn visit_property_hook(&mut self, hook: &PropertyHook) -> ControlFlow<()> {
+        self.in_function(None, |v| walk_owned_property_hook(v, hook))
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {

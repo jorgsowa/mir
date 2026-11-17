@@ -9,6 +9,7 @@ class Foo {
             echo 'work';
         } finally {
             return;
+//          ^^^^^^^ DeprecatedSyntax: Returning from a finally block is deprecated
         }
 
         $this->helper();

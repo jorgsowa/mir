@@ -339,7 +339,6 @@ fn analyze_scope(
             );
             crate::body_analysis::check_deprecated_syntax(
                 &parsed.program.stmts,
-                prepared.php_version,
                 path,
                 text.as_ref(),
                 &parsed.source_map,

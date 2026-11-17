@@ -1,5 +1,5 @@
 ===description===
-From PHP 8.6 returning a value from a constructor or destructor, or making one a generator, is deprecated; a bare return and closures inside are fine.
+From PHP 8.6 returning a value from a constructor or destructor, or making one a generator, is deprecated; a bare return, closures and property hooks inside are fine.
 ===config===
 <mir>
   <phpVersion>8.6</phpVersion>
@@ -25,4 +25,13 @@ class Connection {
         yield 1;
 //      ^^^^^^^ DeprecatedSyntax: Making a destructor a Generator is deprecated
     }
+}
+
+final class Point {
+    public function __construct(
+        public int $x {
+            get { return $this->x; }
+            set { $this->x = $value; }
+        },
+    ) {}
 }

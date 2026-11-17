@@ -7,6 +7,7 @@ function test(): void {
         echo 'work';
     } finally {
         return;
+//      ^^^^^^^ DeprecatedSyntax: Returning from a finally block is deprecated
     }
 
     echo 'unreachable';

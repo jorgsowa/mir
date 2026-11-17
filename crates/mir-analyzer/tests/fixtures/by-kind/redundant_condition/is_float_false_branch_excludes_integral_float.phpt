@@ -30,6 +30,7 @@ function test_false_branch(bool $cond, string $s) {
 function test_double_false_branch(bool $cond, string $s) {
     $x = $cond ? floor(3.5) : $s;
     if (!is_double($x)) {
+//       ^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function is_double
         /** @mir-check $x is string */
         $_ = $x;
     }

@@ -1,5 +1,5 @@
 ===description===
-A built-in method is deprecated only from the PHP version its stub names; ArrayObject keeps the sort methods ArrayIterator loses in 8.6.
+PHP 8.6 deprecates ArrayIterator's sort methods and SplFileObject's CSV methods; ArrayObject keeps its sort methods.
 ===config===
 <mir>
   <phpVersion>8.6</phpVersion>

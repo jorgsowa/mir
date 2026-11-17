@@ -2039,7 +2039,7 @@ impl<'a> DefinitionCollector<'a> {
         );
     }
 
-    /// `@deprecated` or `#[Deprecated]`; in stubs a version (`since:`, `@deprecated 8.1`) after the target means not deprecated yet.
+    /// `@deprecated` or `#[Deprecated]`, whatever version a stub gives in `since:`.
     fn deprecation(
         &self,
         doc_tag: Option<&str>,
@@ -2048,14 +2048,6 @@ impl<'a> DefinitionCollector<'a> {
         let attr = attributes
             .iter()
             .find(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"));
-        if let Some(target) = self.php_version {
-            let since = attr
-                .and_then(|a| version_attrs::named_string_arg(a, "since"))
-                .or_else(|| doc_tag.and_then(|t| t.split_whitespace().next().map(str::to_string)));
-            if since.is_some_and(|since| !target.includes_symbol(Some(&since), None)) {
-                return None;
-            }
-        }
         doc_tag
             .map(Arc::from)
             .or_else(|| attr.map(|_| Arc::from("")))

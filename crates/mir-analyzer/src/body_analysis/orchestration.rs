@@ -42,14 +42,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 &mut all_issues,
             );
-            check_deprecated_syntax(
-                &program.stmts,
-                self.php_version,
-                &file,
-                source,
-                source_map,
-                &mut all_issues,
-            );
+            check_deprecated_syntax(&program.stmts, &file, source, source_map, &mut all_issues);
         }
 
         self.analyze_top_level_stmts(
@@ -216,14 +209,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 &mut all_issues,
             );
-            check_deprecated_syntax(
-                &program.stmts,
-                self.php_version,
-                &file,
-                source,
-                source_map,
-                &mut all_issues,
-            );
+            check_deprecated_syntax(&program.stmts, &file, source, source_map, &mut all_issues);
         }
         self.analyze_top_level_stmts_typed(
             &program.stmts,

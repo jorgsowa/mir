@@ -1,13 +1,13 @@
 ---
 title: DeprecatedSyntax
 code: MIR1015
-description: A declaration or statement that PHP deprecates at compile time for the target version.
+description: A declaration or statement that PHP deprecates at compile time.
 sidebar:
   hidden: true
   order: 10
 ---
 
-The message is the deprecation PHP emits when it compiles the code. From PHP 8.6 these are:
+The message is the deprecation PHP emits when it compiles the code. These are PHP 8.6's, reported whatever the target version, so code can drop them before upgrading:
 
 - `return` inside a `finally` block.
 - `return` with a value, or `yield`, in `__construct()` or `__destruct()`.

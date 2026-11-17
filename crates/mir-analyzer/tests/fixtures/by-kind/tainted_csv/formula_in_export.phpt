@@ -16,6 +16,7 @@ function export($out, SplFileObject $file): void {
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedCsv: Tainted CSV field — possible spreadsheet formula injection
     $file->fputcsv(['id', '=' . $_GET['note']]);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedCsv: Tainted CSV field — possible spreadsheet formula injection
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedMethod: Method SplFileObject::fputcsv() is deprecated
     fputcsv($out, $_POST);
 //  ^^^^^^^^^^^^^^^^^^^^^ TaintedCsv: Tainted CSV field — possible spreadsheet formula injection
 }
