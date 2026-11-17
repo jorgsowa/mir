@@ -47,6 +47,11 @@ fn is_reserved_name(name: &str) -> bool {
     name.eq_ignore_ascii_case("let") || name.eq_ignore_ascii_case("is")
 }
 
+fn is_namespace_name(name: &php_ast::owned::Ident) -> bool {
+    name.as_str()
+        .is_some_and(|n| n.eq_ignore_ascii_case("namespace"))
+}
+
 fn last_segment(name: &str) -> &str {
     name.rsplit('\\').next().unwrap_or(name)
 }
@@ -330,16 +335,11 @@ impl OwnedVisitor for DeprecatedSyntaxVisitor<'_> {
             ClassMemberKind::Method(m) => {
                 return self.visit_method(m, |v| walk_owned_class_member(v, member));
             }
-            ClassMemberKind::ClassConst(c) => {
-                if c.name
-                    .as_str()
-                    .is_some_and(|n| n.eq_ignore_ascii_case("namespace"))
-                {
-                    self.report(
-                        c.name.span,
-                        "Declaring class constant called 'namespace' is deprecated".into(),
-                    );
-                }
+            ClassMemberKind::ClassConst(c) if is_namespace_name(&c.name) => {
+                self.report(
+                    c.name.span,
+                    "Declaring class constant called 'namespace' is deprecated".into(),
+                );
             }
             _ => {}
         }
@@ -351,16 +351,11 @@ impl OwnedVisitor for DeprecatedSyntaxVisitor<'_> {
             EnumMemberKind::Method(m) => {
                 return self.visit_method(m, |v| walk_owned_enum_member(v, member));
             }
-            EnumMemberKind::ClassConst(c) => {
-                if c.name
-                    .as_str()
-                    .is_some_and(|n| n.eq_ignore_ascii_case("namespace"))
-                {
-                    self.report(
-                        c.name.span,
-                        "Declaring class constant called 'namespace' is deprecated".into(),
-                    );
-                }
+            EnumMemberKind::ClassConst(c) if is_namespace_name(&c.name) => {
+                self.report(
+                    c.name.span,
+                    "Declaring class constant called 'namespace' is deprecated".into(),
+                );
             }
             _ => {}
         }
