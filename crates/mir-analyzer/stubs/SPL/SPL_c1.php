@@ -732,6 +732,7 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
      */
     #[TentativeType]
     #[LanguageLevelTypeAware(['8.1' => 'array|false'], default: 'array|false|null')]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function fgetcsv(
         #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $separator = ",",
         #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $enclosure = "\"",
@@ -754,6 +755,7 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
      * @since 5.4
      */
     #[TentativeType]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function fputcsv(
         array $fields,
         #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $separator = ',',
@@ -777,6 +779,7 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
      * @return void No value is returned.
      */
     #[TentativeType]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function setCsvControl(
         #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $separator = ",",
         #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $enclosure = "\"",
@@ -789,6 +792,7 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
      * @return array an indexed array containing the delimiter and enclosure character.
      */
     #[TentativeType]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function getCsvControl(): array {}
 
     /**

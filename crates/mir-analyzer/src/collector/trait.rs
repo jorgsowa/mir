@@ -221,17 +221,8 @@ impl<'a> DefinitionCollector<'a> {
                                 }),
                             ),
                             location: Some(self.location(member.span.start, member.span.end)),
-                            deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(
-                                || {
-                                    if p.attributes.iter().any(|a| {
-                                        a.name.last_part().eq_ignore_ascii_case("Deprecated")
-                                    }) {
-                                        Some(Arc::from(""))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ),
+                            deprecated: self
+                                .deprecation(prop_doc.deprecated.as_deref(), &p.attributes),
                             has_native_type: p.type_hint.is_some(),
                             get_only_hook: super::is_get_only_hook(&p.hooks),
                             abstract_hooks: super::abstract_hooks(&p.hooks),
@@ -291,17 +282,8 @@ impl<'a> DefinitionCollector<'a> {
                             is_final: c.modifiers.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
                             is_override: self.has_override_attribute(&c.attributes),
-                            deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
-                                || {
-                                    if c.attributes.iter().any(|a| {
-                                        a.name.last_part().eq_ignore_ascii_case("Deprecated")
-                                    }) {
-                                        Some(Arc::from(""))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ),
+                            deprecated: self
+                                .deprecation(const_doc.deprecated.as_deref(), &c.attributes),
                         },
                     );
                 }
@@ -390,10 +372,7 @@ impl<'a> DefinitionCollector<'a> {
             is_immutable: trait_doc.is_immutable,
             require_extends,
             require_implements,
-            deprecated: Self::deprecated_from_doc_or_attrs(
-                trait_doc.deprecated.as_deref(),
-                &decl.attributes,
-            ),
+            deprecated: self.deprecation(trait_doc.deprecated.as_deref(), &decl.attributes),
             type_aliases: Self::stored_type_aliases(&type_aliases),
         }));
 

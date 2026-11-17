@@ -133,16 +133,7 @@ impl DefinitionCollector<'_> {
                         continue;
                     }
                     let case_deprecated =
-                        case_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                            if c.attributes
-                                .iter()
-                                .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
-                            {
-                                Some(Arc::from(""))
-                            } else {
-                                None
-                            }
-                        });
+                        self.deprecation(case_doc.deprecated.as_deref(), &c.attributes);
 
                     // Extract the literal type from the case value expression (e.g. `= 'foo'`, `= 42`).
                     // Falls back to mixed when the expression is not a simple literal (class constant,
@@ -272,17 +263,8 @@ impl DefinitionCollector<'_> {
                             is_final: c.modifiers.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
                             is_override: self.has_override_attribute(&c.attributes),
-                            deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
-                                || {
-                                    if c.attributes.iter().any(|a| {
-                                        a.name.last_part().eq_ignore_ascii_case("Deprecated")
-                                    }) {
-                                        Some(Arc::from(""))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ),
+                            deprecated: self
+                                .deprecation(const_doc.deprecated.as_deref(), &c.attributes),
                         },
                     );
                 }
@@ -319,10 +301,7 @@ impl DefinitionCollector<'_> {
                         is_override: self.has_override_attribute(&p.attributes),
                         default: mir_codebase::definitions::wrap_property_type(default_ty),
                         location: Some(self.location(member.span.start, member.span.end)),
-                        deprecated: Self::deprecated_from_doc_or_attrs(
-                            prop_doc.deprecated.as_deref(),
-                            &p.attributes,
-                        ),
+                        deprecated: self.deprecation(prop_doc.deprecated.as_deref(), &p.attributes),
                         has_native_type: p.type_hint.is_some(),
                         get_only_hook: super::is_get_only_hook(&p.hooks),
                         abstract_hooks: super::abstract_hooks(&p.hooks),
@@ -448,10 +427,7 @@ impl DefinitionCollector<'_> {
                 trait_use_locations,
                 trait_use_type_args,
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
-                deprecated: Self::deprecated_from_doc_or_attrs(
-                    enum_doc.deprecated.as_deref(),
-                    &decl.attributes,
-                ),
+                deprecated: self.deprecation(enum_doc.deprecated.as_deref(), &decl.attributes),
                 type_aliases: Self::stored_type_aliases(&type_aliases),
                 own_properties,
             }));

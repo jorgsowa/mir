@@ -478,6 +478,7 @@ function substr_compare(string $haystack, string $needle, int $offset, ?int $len
  * str2, and 0 if they are equal.
  * @pure
  */
+#[\JetBrains\PhpStorm\Deprecated(reason: "use Collator::compare() instead", since: "8.6")]
 function strcoll(string $string1, string $string2): int {}
 
 /**

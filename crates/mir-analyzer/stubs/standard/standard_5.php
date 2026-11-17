@@ -63,6 +63,7 @@ function floatval(mixed $value): float {}
  * @return float value of the given variable. Empty arrays return 0, non-empty arrays return 1.
  * @pure
  */
+#[\JetBrains\PhpStorm\Deprecated(reason: "use floatval() instead", since: "8.6")]
 function doubleval(mixed $value): float {}
 
 /**
@@ -189,6 +190,7 @@ function is_bool(mixed $value): bool {}
  * false otherwise.
  * @pure
  */
+#[\JetBrains\PhpStorm\Deprecated(reason: "use is_int() instead", since: "8.6")]
 function is_long(mixed $value): bool {}
 
 /**
@@ -226,6 +228,7 @@ function is_int(mixed $value): bool {}
  * false otherwise.
  * @pure
  */
+#[\JetBrains\PhpStorm\Deprecated(reason: "use is_int() instead", since: "8.6")]
 function is_integer(mixed $value): bool {}
 
 /**
@@ -239,6 +242,7 @@ function is_integer(mixed $value): bool {}
  * false otherwise.
  * @pure
  */
+#[\JetBrains\PhpStorm\Deprecated(reason: "use is_float() instead", since: "8.6")]
 function is_double(mixed $value): bool {}
 
 /**

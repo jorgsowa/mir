@@ -24,6 +24,7 @@ function testIsDouble($x) {
 
 function testIsReal($x) {
     if (is_real($x)) {
+//      ^^^^^^^^^^^ DeprecatedCall: Call to deprecated function is_real
         return sqrt($x);
     }
 }

@@ -385,18 +385,7 @@ impl DefinitionCollector<'_> {
                 .iter()
                 .map(|n| Arc::from(n.as_str()))
                 .collect(),
-            deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                // Only detect #[Deprecated] without arguments (no-arg form used in
-                // user code). Stubs use #[Deprecated(since: '...', ...)] with args
-                // which would otherwise flood callers with spurious DeprecatedCall.
-                if decl.attributes.iter().any(|a| {
-                    a.args.is_empty() && a.name.last_part().eq_ignore_ascii_case("Deprecated")
-                }) {
-                    Some(Arc::from(""))
-                } else {
-                    None
-                }
-            }),
+            deprecated: self.deprecation(doc.deprecated.as_deref(), &decl.attributes),
             is_pure: doc.is_pure || self.pure_attr(&decl.attributes),
             pure_unless_callable_impure: doc
                 .pure_unless_callable_impure

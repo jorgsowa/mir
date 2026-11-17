@@ -1981,6 +1981,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      * @return int The current flags.
      */
     #[TentativeType]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function getFlags(): int {}
 
     /**
@@ -1995,6 +1996,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      * @return void No value is returned.
      */
     #[TentativeType]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function setFlags(#[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $flags): void {}
 
     /**
@@ -2003,6 +2005,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      */
     #[TentativeType]
     #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function asort(#[PhpStormStubsElementAvailable(from: '8.0')] int $flags = SORT_REGULAR) {}
 
     /**
@@ -2011,6 +2014,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      */
     #[TentativeType]
     #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function ksort(#[PhpStormStubsElementAvailable(from: '8.0')] int $flags = SORT_REGULAR) {}
 
     /**
@@ -2022,6 +2026,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      */
     #[TentativeType]
     #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function uasort(#[LanguageLevelTypeAware(['8.0' => 'callable'], default: '')] $callback) {}
 
     /**
@@ -2033,6 +2038,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      */
     #[TentativeType]
     #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function uksort(#[LanguageLevelTypeAware(['8.0' => 'callable'], default: '')] $callback) {}
 
     /**
@@ -2041,6 +2047,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      */
     #[TentativeType]
     #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function natsort() {}
 
     /**
@@ -2049,6 +2056,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      */
     #[TentativeType]
     #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function natcasesort() {}
 
     /**
@@ -2060,6 +2068,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      * @return void
      */
     #[TentativeType]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function unserialize(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $data): void {}
 
     /**
@@ -2068,6 +2077,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      * @return string The serialized <b>ArrayIterator</b>.
      */
     #[TentativeType]
+    #[\JetBrains\PhpStorm\Deprecated(since: "8.6")]
     public function serialize(): string {}
 
     /**

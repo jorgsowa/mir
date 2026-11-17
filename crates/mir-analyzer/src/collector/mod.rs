@@ -1219,7 +1219,7 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     /// Whether an element (function/method) is marked `#[Pure]`. Mirrors the
-    /// [`Self::deprecated_from_doc_or_attrs`]/inline deprecated handling: matches
+    /// [`Self::deprecation`]/inline deprecated handling: matches
     /// on the last name segment so it works with both bare attrs and aliased
     /// imports, independent of stub vs source. Stub purity (phpstorm-stubs)
     /// flows from these attributes when a docblock tag is absent.
@@ -2039,25 +2039,26 @@ impl<'a> DefinitionCollector<'a> {
         );
     }
 
-    /// `@deprecated` docblock tag, falling back to a bare `#[Deprecated]` /
-    /// `#[\Deprecated]` attribute when there's no docblock tag. Shared by
-    /// every declaration kind that carries both a docblock and attributes
-    /// (interface/trait/enum decls, class-level already has its own inline
-    /// copy of this same fallback).
-    fn deprecated_from_doc_or_attrs(
+    /// `@deprecated` or `#[Deprecated]`; in stubs a version (`since:`, `@deprecated 8.1`) after the target means not deprecated yet.
+    fn deprecation(
+        &self,
         doc_tag: Option<&str>,
         attributes: &[php_ast::owned::Attribute],
     ) -> Option<Arc<str>> {
-        doc_tag.map(Arc::from).or_else(|| {
-            if attributes
-                .iter()
-                .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
-            {
-                Some(Arc::from(""))
-            } else {
-                None
+        let attr = attributes
+            .iter()
+            .find(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"));
+        if let Some(target) = self.php_version {
+            let since = attr
+                .and_then(|a| version_attrs::named_string_arg(a, "since"))
+                .or_else(|| doc_tag.and_then(|t| t.split_whitespace().next().map(str::to_string)));
+            if since.is_some_and(|since| !target.includes_symbol(Some(&since), None)) {
+                return None;
             }
-        })
+        }
+        doc_tag
+            .map(Arc::from)
+            .or_else(|| attr.map(|_| Arc::from("")))
     }
 
     // -----------------------------------------------------------------------
@@ -3283,16 +3284,7 @@ impl<'a> DefinitionCollector<'a> {
                 .iter()
                 .map(|n| Arc::from(n.as_str()))
                 .collect(),
-            deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                if m.attributes
-                    .iter()
-                    .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
-                {
-                    Some(Arc::from(""))
-                } else {
-                    None
-                }
-            }),
+            deprecated: self.deprecation(doc.deprecated.as_deref(), &m.attributes),
             is_internal: doc.is_internal,
             internal_scope: doc.internal_scope.as_deref().map(Arc::from),
             is_pure: doc.is_pure || self.pure_attr(&m.attributes),

@@ -24,5 +24,6 @@ final class Codes {
         $chars = 'abcdef0123456789';
         return 'key_' . $chars[rand(0, 15)] . sha1((string) lcg_value());
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureRandomness: Insecure randomness: the value createApiKey() returns comes from a non-cryptographic generator; use random_bytes() or random_int()
+//                                                          ^^^^^^^^^^^ DeprecatedCall: Call to deprecated function lcg_value
     }
 }

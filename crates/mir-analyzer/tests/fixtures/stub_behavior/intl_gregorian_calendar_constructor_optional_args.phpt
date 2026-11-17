@@ -14,4 +14,5 @@ function calendars(\DateTimeZone $tz, \IntlTimeZone $itz): void {
 
 function legacy(\DateTimeZone $tz): ?\IntlGregorianCalendar {
     return intlgregcal_create_instance($tz, 'en_US');
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function intlgregcal_create_instance
 }

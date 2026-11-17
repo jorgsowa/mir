@@ -49,10 +49,14 @@ function run(mixed $m, CurlHandle $c, ?object $o, $legacy): void {
     if ($curl !== false) {
         /** @mir-check $curl is CurlHandle */
         curl_close($curl);
+//      ^^^^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function curl_close
     }
     curl_close($c);
+//  ^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function curl_close
     curl_close($o);
 //             ^^ PossiblyNullArgument: Argument $handle of curl_close() might be null
+//  ^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function curl_close
     curl_close($legacy);
 //             ^^^^^^^ PossiblyNullArgument: Argument $handle of curl_close() might be null
+//  ^^^^^^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function curl_close
 }

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- PHP 8.6 deprecations of `is_double()`, `is_long()`, `is_integer()`, `doubleval()`, `strcoll()`, `metaphone()`, `spl_classes()`, `spl_object_hash()`, `mysqli_get_charset()`, `mysqli_stmt_init()`, the Mbregex functions and their `ArrayIterator`, `SplFileObject` CSV and `mysqli` method counterparts.
 - From PHP 8.6, report `#[\Override]` on a class constant or enum case without a public or protected constant of that name in a parent class or interface as InvalidOverride.
 - Report a subclass of a `@psalm-consistent-templates` class that doesn't pass the parent's templates through unchanged, as InvalidExtendClass.
 - `$x = yield $obj` is typed from the `@psalm-yield` of `$obj`'s class or an ancestor.
@@ -51,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Deprecations of built-in functions, methods, classes and class constants follow the target PHP version: a stub `#[Deprecated(since: ...)]` or `@deprecated X.Y` newer than the target is not reported (`SplObjectStorage::attach()` is no longer deprecated for 8.4), and built-in functions deprecated at or before the target are reported as DeprecatedCall. Functions declared with `#[\Deprecated("message")]` are reported too.
 - `WeakCryptography`, `InsecureFilePermissions`, `InsecurePasswordHash`, `InsecureSessionConfig`, `InsecureTls` and `HardcodedCredential` also read values held in a variable, global constant or class constant with one literal value, such as `chmod($f, self::MODE)` or options built in a variable first. `HardcodedCredential` skips placeholders such as `%env(DB_PASSWORD)%`, `${DB_PASS}`, `{{ password }}`, `<password>` and `****`.
 - `ResourceExhaustion` and `TimingUnsafeComparison` treat values read through Symfony's `Request` and its parameter bags, a Laravel request or `Request` facade, or a PSR-7 server request as request data, like `$_GET`; so do the other checks that follow request data through variables.
 - `TaintedXml` reads libxml flags, and `TaintedSsrf` reads `FILTER_VALIDATE_IP` flags, held in a variable. `InsecureSessionConfig` reports `session_id()` of a query or form parameter read through Symfony's `Request` or a Laravel request; a value from the cookie bag isn't reported.

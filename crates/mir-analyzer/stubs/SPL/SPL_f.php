@@ -9,6 +9,7 @@ use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
  * @return array
  * @pure
  */
+#[\JetBrains\PhpStorm\Deprecated(reason: "use ReflectionExtension::getClassNames() instead", since: "8.6")]
 function spl_classes(): array {}
 
 /**
@@ -135,6 +136,7 @@ function class_implements($object_or_class, bool $autoload = true): array|false 
  * the same object.
  * @pure
  */
+#[\JetBrains\PhpStorm\Deprecated(reason: "consider using spl_object_id() instead", since: "8.6")]
 function spl_object_hash(object $object): string {}
 
 /**

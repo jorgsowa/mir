@@ -9,6 +9,7 @@ cross file invalid arg to removed function
 function test_wrong_type(int $n): void {
     hebrevc($n);
 //          ^^ ArgumentTypeCoercion: Argument $hebrew_text of hebrevc() expects 'string', got 'int' — coercion may fail at runtime
+//  ^^^^^^^^^^^ DeprecatedCall: Call to deprecated function hebrevc
 }
 ===file:App.php===
 <?php

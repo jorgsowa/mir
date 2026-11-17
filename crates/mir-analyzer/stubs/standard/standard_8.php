@@ -138,6 +138,7 @@ function define_syslog_variables() {}
  * @pure
  */
 #[LanguageLevelTypeAware(["8.0" => "string"], default: "string|false")]
+#[\JetBrains\PhpStorm\Deprecated(reason: "use a userland phonetic matching library instead", since: "8.6")]
 function metaphone(string $string, int $max_phonemes = 0) {}
 
 /**

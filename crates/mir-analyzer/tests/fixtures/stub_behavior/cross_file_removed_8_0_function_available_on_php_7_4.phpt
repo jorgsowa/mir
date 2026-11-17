@@ -8,6 +8,7 @@ cross file removed 8 0 function available on php 7 4
 <?php
 function format_hebrew(string $text): void {
     hebrevc($text);
+//  ^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function hebrevc
 }
 ===file:App.php===
 <?php
