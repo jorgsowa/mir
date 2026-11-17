@@ -1341,6 +1341,7 @@ function socket_import_stream($stream): Socket|false {}
  * @return int|null
  * @since 5.5
  */
+#[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => 'int'], default: '?int')]
 function socket_cmsg_space(
     int $level,
     int $type,

@@ -148,6 +148,7 @@ function filter_input_array(int $type, array|int $options = FILTER_DEFAULT, bool
  * the variable is not set.
  * @pure
  */
+#[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => 'array|false'], default: 'array|false|null')]
 function filter_var_array(array $array, array|int $options = FILTER_DEFAULT, bool $add_empty = true): array|false|null {}
 
 /**

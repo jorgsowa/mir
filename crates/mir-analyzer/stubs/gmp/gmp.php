@@ -731,6 +731,25 @@ function gmp_rootrem(GMP|string|int $num, int $nth): array {}
 function gmp_nextprime(GMP|string|int $num): GMP {}
 
 /**
+ * Modular exponentiation that takes the same time whatever the exponent's value.
+ * @param GMP|int|string $num
+ * @param GMP|int|string $exponent
+ * @param GMP|int|string $modulus
+ * @return GMP
+ * @since 8.6
+ */
+function gmp_powm_sec(GMP|int|string $num, GMP|int|string $exponent, GMP|int|string $modulus): GMP {}
+
+/**
+ * The largest prime smaller than the given number.
+ * @param GMP|int|string $num
+ * @param bool $definitely_prime Set to whether the result is definitely prime rather than probably prime.
+ * @return GMP
+ * @since 8.6
+ */
+function gmp_prevprime(GMP|int|string $num, &$definitely_prime = null): GMP {}
+
+/**
  * Calculates binomial coefficient
  *
  * @link https://www.php.net/manual/en/function.gmp-binomial.php

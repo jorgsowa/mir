@@ -1708,6 +1708,7 @@ function zip_entry_open($zip_dp, $zip_entry, string $mode = 'rb'): bool {}
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  * @deprecated 8.0 Use {@link ZipArchive} instead.
  */
+#[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => 'true'], default: 'bool')]
 function zip_entry_close($zip_entry): bool {}
 
 /**

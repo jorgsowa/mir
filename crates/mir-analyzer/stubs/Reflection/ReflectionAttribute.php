@@ -40,6 +40,27 @@ class ReflectionAttribute implements Reflector
     public function getName(): string {}
 
     /**
+     * Whether the attribute's class name is in a namespace.
+     * @since 8.6
+     */
+    #[Pure]
+    public function inNamespace(): bool {}
+
+    /**
+     * The namespace of the attribute's class name.
+     * @since 8.6
+     */
+    #[Pure]
+    public function getNamespaceName(): string {}
+
+    /**
+     * The attribute's class name without its namespace.
+     * @since 8.6
+     */
+    #[Pure]
+    public function getShortName(): string {}
+
+    /**
      * Returns the target of the attribute as a bit mask format.
      *
      * @link https://php.net/manual/en/reflectionattribute.gettarget.php

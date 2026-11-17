@@ -324,6 +324,7 @@ function register_shutdown_function(callable $callback, mixed ...$args) {}
  * </p>
  * @return bool true on success or false on failure.
  */
+#[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => 'true'], default: 'bool')]
 function register_tick_function(callable $callback, mixed ...$args): bool {}
 
 /**

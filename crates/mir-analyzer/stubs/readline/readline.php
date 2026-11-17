@@ -107,6 +107,7 @@ function readline_write_history(?string $filename = null): bool {}
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
+#[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => 'true'], default: 'bool')]
 function readline_completion_function(callable $callback): bool {}
 
 /**

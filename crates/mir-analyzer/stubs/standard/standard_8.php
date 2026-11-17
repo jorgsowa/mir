@@ -77,6 +77,7 @@ function closelog() {}
  * @param callable $callback Function called just before the headers are sent.
  * @return bool true on success or false on failure.
  */
+#[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => 'true'], default: 'bool')]
 function header_register_callback(callable $callback): bool {}
 
 /**
