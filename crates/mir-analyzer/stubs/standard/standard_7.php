@@ -429,7 +429,7 @@ function getdir(string $directory, $context = null): Directory|false {}
  * boolean false is returned, and an error of level
  * E_WARNING is generated.
  */
-function scandir(string $directory, int $sorting_order = 0, $context = null): array|false {}
+function scandir(string $directory, #[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => '0|1|2'], default: 'int')] int $sorting_order = 0, $context = null): array|false {}
 
 /**
  * Find pathnames matching a pattern

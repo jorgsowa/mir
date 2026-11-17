@@ -265,7 +265,7 @@ function pathinfo(string $path, #[ExpectedValues(flags: [
     PATHINFO_BASENAME,
     PATHINFO_EXTENSION,
     PATHINFO_FILENAME
-])] int $flags = PATHINFO_ALL): array|string {}
+])] #[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => '1|2|4|8|15'], default: 'int')] int $flags = PATHINFO_ALL): array|string {}
 
 /**
  * Un-quotes a quoted string

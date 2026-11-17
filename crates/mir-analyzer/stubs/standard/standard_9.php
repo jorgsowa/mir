@@ -215,7 +215,7 @@ function array_flip(array $array): array {}
  * @meta
  * @pure
  */
-function array_change_key_case(array $array, int $case = CASE_LOWER): array {}
+function array_change_key_case(array $array, #[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => '0|1'], default: 'int')] int $case = CASE_LOWER): array {}
 
 /**
  * Pick one or more random keys out of an array
@@ -721,7 +721,7 @@ function array_product(array $array): int|float {}
  * @return array the filtered array.
  * @meta
  */
-function array_filter(array $array, ?callable $callback = null, int $mode = 0): array {}
+function array_filter(array $array, ?callable $callback = null, #[\JetBrains\PhpStorm\Internal\LanguageLevelTypeAware(['8.6' => '0|1|2'], default: 'int')] int $mode = 0): array {}
 
 /**
  * Applies the callback to the elements of the given arrays

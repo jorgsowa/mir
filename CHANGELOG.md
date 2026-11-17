@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- From PHP 8.6, report a literal flag outside the accepted constants for `array_filter()` `$mode`, `array_change_key_case()` `$case`, `pathinfo()` `$flags` (also a combination such as `PATHINFO_DIRNAME | PATHINFO_BASENAME`) and `scandir()` `$sorting_order` as InvalidArgument; PHP throws a ValueError.
 - PHP 8.6 stubs: `Time\Duration`, `Time\TimeException`, `gmp_powm_sec()`, `gmp_prevprime()` and `ReflectionAttribute::inNamespace()`, `getNamespaceName()` and `getShortName()`. From 8.6 `filter_var_array()` returns `array|false`, `socket_cmsg_space()` returns `int`, and `zip_entry_close()`, `header_register_callback()`, `register_tick_function()` and `readline_completion_function()` return `true`.
 - From PHP 8.6, report `define()` with a third argument and `is_a()` of a string, or `is_subclass_of()` of a string with `$allow_string` false, as DeprecatedCall, and `define()` of a constant named `let`, `is` or `_` or `class_alias()` to `let` or `is` as DeprecatedSyntax.
 - `DeprecatedSyntax` (MIR1015, info): the compile-time deprecations of the target PHP version, with PHP's message. From PHP 8.6: `return` inside `finally`; `return` with a value, or `yield`, in `__construct()` or `__destruct()`; a class constant named `namespace`; a function named `readonly`; `let` or `is` as a class-like, function or constant name or as a `use` alias; `_` as a constant name or `use` alias; and a `__debugInfo()` return type that allows `null`.
