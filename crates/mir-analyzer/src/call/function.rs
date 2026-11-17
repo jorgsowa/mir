@@ -688,6 +688,7 @@ impl CallAnalyzer {
         if fn_name_lower == "ldap_bind" {
             crate::security::check_ldap_bind(ea, &call.args, &arg_types, ctx, span);
         }
+        ea.check_deprecated_call_form(&fn_name_lower, &call.args, &arg_types, span);
         let mut arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
         let mut arg_names: Vec<Option<String>> = call
             .args

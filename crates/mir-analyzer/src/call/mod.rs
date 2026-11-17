@@ -3,6 +3,7 @@ mod args;
 mod array_builtins;
 mod builtin_purity;
 mod callable;
+mod deprecated_forms;
 mod function;
 pub(crate) mod method;
 mod opaque_callback;
