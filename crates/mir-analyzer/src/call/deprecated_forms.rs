@@ -37,6 +37,10 @@ fn is_string_type(ty: &Type) -> bool {
     !ty.types.is_empty() && ty.types.iter().all(|a| a.is_string())
 }
 
+fn is_object_type(ty: &Type) -> bool {
+    !ty.types.is_empty() && ty.types.iter().all(|a| a.is_object())
+}
+
 /// PHP's message for a constant name it reserves from 8.6; a namespaced short name matches only in lowercase.
 fn reserved_constant(name: &str) -> Option<&'static str> {
     let (namespaced, short) = match name.trim_start_matches('\\').rsplit_once('\\') {
@@ -58,7 +62,8 @@ fn reserved_constant(name: &str) -> Option<&'static str> {
 
 impl ExpressionAnalyzer<'_> {
     /// `define()` with a third argument or a reserved name, `class_alias()` to a reserved
-    /// name, and `is_a()`/`is_subclass_of()` of a string with `$allow_string` false.
+    /// name, `is_a()`/`is_subclass_of()` of a string with `$allow_string` false, and an
+    /// object passed to `array_walk()` or `http_build_query()`.
     pub(super) fn check_deprecated_call_form(
         &mut self,
         fn_name_lower: &str,
@@ -72,6 +77,30 @@ impl ExpressionAnalyzer<'_> {
             return;
         }
         match fn_name_lower {
+            "array_walk" | "array_walk_recursive" | "http_build_query" => {
+                let (param, name) = if fn_name_lower == "http_build_query" {
+                    ("$data", "data")
+                } else {
+                    ("$array", "array")
+                };
+                let is_object = arg_at(args, 0, name)
+                    .is_some_and(|(i, _)| arg_types.get(i).is_some_and(is_object_type));
+                if is_object {
+                    self.emit(
+                        IssueKind::DeprecatedCall {
+                            name: fn_name_lower.to_string(),
+                            message: Some(
+                                format!(
+                                    "{fn_name_lower}(): Passing an object for argument #1 {param} to {fn_name_lower}() is deprecated, call get_object_vars() first instead"
+                                )
+                                .into(),
+                            ),
+                        },
+                        Severity::Info,
+                        span,
+                    );
+                }
+            }
             "define" => {
                 if arg_at(args, 2, "case_insensitive").is_some() {
                     self.emit(
